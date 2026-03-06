@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+html,
+body {
+  background: #0f0f1a;
+  color: #e2e8f0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Viewfinder corners for QR scanner */
+.viewfinder-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: #6366f1;
+  border-style: solid;
+  border-width: 3px 0 0 3px;
+  animation: viewfinder-pulse 2s ease-in-out infinite;
+}
+
+@keyframes viewfinder-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Smooth page transitions */
+* {
+  transition-property: background-color, border-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Remove transition from inputs to avoid lag */
+input,
+button,
+a {
+  transition-property: background-color, border-color, opacity, transform;
+  transition-duration: 150ms;
+}
+
+/* Hide html5-qrcode default UI clutter */
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+#qr-reader video {
+  border-radius: 16px;
+}
