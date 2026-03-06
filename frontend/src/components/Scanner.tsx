@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 import { ContactData } from "@/lib/types";
 
 function parseVCard(text: string): Partial<ContactData> {
@@ -92,21 +91,28 @@ interface ScannerProps {
 }
 
 export default function Scanner({ onScan, onClose }: ScannerProps) {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const elementId = "qr-reader";
-    const scanner = new Html5Qrcode(elementId);
-    scannerRef.current = scanner;
+    let cancelled = false;
 
-    scanner
-      .start(
+    import("html5-qrcode").then(({ Html5Qrcode }) => {
+      if (cancelled) return;
+      const scanner = new Html5Qrcode(elementId);
+      scannerRef.current = scanner;
+      let stopped = false;
+
+      scanner
+        .start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          scanner.stop().catch(console.error);
+          if (stopped) return;
+          stopped = true;
+          scanner.stop().catch(() => {});
 
           if (navigator.vibrate) navigator.vibrate(200);
 
@@ -133,25 +139,38 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
         },
         () => {}
       )
-      .catch((err) => {
+      .catch((err: any) => {
         console.error("Erro ao iniciar scanner:", err);
         setError("Nao foi possivel acessar a camera. Verifique as permissoes.");
       });
+    });
 
     return () => {
-      scanner.stop().catch(() => {});
+      cancelled = true;
+      if (scannerRef.current) {
+        try {
+          const state = scannerRef.current.getState();
+          if (state === 2 || state === 3) {
+            scannerRef.current.stop().catch(() => {});
+          }
+        } catch {
+          scannerRef.current.stop().catch(() => {});
+        }
+      }
     };
   }, [onScan]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0f0f1a]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-900">
       <div className="flex items-center justify-between p-4">
         <h2 className="text-lg font-semibold text-white">Escanear QR Code</h2>
         <button
           onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white text-xl"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white"
         >
-          X
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
 
@@ -162,6 +181,7 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
             <button
               onClick={onClose}
               className="mt-4 rounded-xl bg-white/10 px-6 py-3 text-white"
+              style={{ minHeight: 52 }}
             >
               Voltar
             </button>

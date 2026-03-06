@@ -22,22 +22,22 @@ export default function ContactPreview({
   });
 
   const update = (field: keyof ContactData, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value || null }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = () => {
-    if (!form.name.trim()) return;
+    if (!form.name?.trim()) return;
     onSave({ ...form, name: form.name.trim() });
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] px-4 py-6">
-      <h2 className="mb-6 text-xl font-semibold text-white text-center">
+    <div className="min-h-screen bg-[#F8FAFC] px-4 py-6">
+      <h2 className="mb-6 text-xl font-semibold text-slate-800 text-center">
         Dados do Contato
       </h2>
 
       {contact.incomplete && (
-        <div className="mb-4 rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm text-amber-400 text-center">
+        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 text-center">
           Alguns dados podem estar incompletos
         </div>
       )}
@@ -45,7 +45,7 @@ export default function ContactPreview({
       <div className="space-y-4">
         <Field
           label="Nome *"
-          value={form.name}
+          value={form.name || ""}
           onChange={(v) => update("name", v)}
           type="text"
           required
@@ -91,14 +91,16 @@ export default function ContactPreview({
       <div className="mt-8 space-y-3">
         <button
           onClick={handleSave}
-          disabled={!form.name.trim()}
-          className="w-full rounded-2xl bg-green-500 py-4 text-lg font-semibold text-white disabled:opacity-40 active:bg-green-600 transition-colors"
+          disabled={!form.name?.trim()}
+          className="w-full rounded-xl bg-indigo-600 py-[14px] text-lg font-semibold text-white disabled:opacity-40 active:bg-indigo-700 transition-colors"
+          style={{ minHeight: 52 }}
         >
           Salvar Contato
         </button>
         <button
           onClick={onReset}
-          className="w-full rounded-2xl bg-white/10 py-4 text-lg font-semibold text-white active:bg-white/20 transition-colors"
+          className="w-full rounded-xl border border-indigo-200 bg-white py-[14px] text-lg font-semibold text-indigo-600 active:bg-indigo-50 transition-colors"
+          style={{ minHeight: 52 }}
         >
           Escanear Outro
         </button>
@@ -120,18 +122,18 @@ function Field({
   type: string;
   required?: boolean;
 }) {
-  const isEmpty = required && !value.trim();
+  const isEmpty = required && !value?.trim();
   return (
     <div>
-      <label className="mb-1 block text-sm text-slate-400">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       <input
         type={type}
-        value={value}
+        value={value || ""}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-xl border bg-[#1a1a2e] px-4 py-3 text-white outline-none transition-colors ${
+        className={`w-full rounded-xl border bg-white px-4 py-3 text-slate-800 outline-none transition-colors ${
           isEmpty
-            ? "border-amber-500/50 focus:border-amber-500"
-            : "border-[#2a2a3e] focus:border-indigo-500"
+            ? "border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+            : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         }`}
       />
     </div>

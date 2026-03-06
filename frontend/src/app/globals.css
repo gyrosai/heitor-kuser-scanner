@@ -2,8 +2,8 @@
 
 html,
 body {
-  background: #0f0f1a;
-  color: #e2e8f0;
+  background: #f8fafc;
+  color: #1e293b;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
@@ -14,7 +14,7 @@ body {
   position: absolute;
   width: 28px;
   height: 28px;
-  border-color: #6366f1;
+  border-color: #4f46e5;
   border-style: solid;
   border-width: 3px 0 0 3px;
   animation: viewfinder-pulse 2s ease-in-out infinite;

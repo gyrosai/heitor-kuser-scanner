@@ -4,7 +4,8 @@ import { useState, useCallback } from "react";
 import { ContactData } from "@/lib/types";
 import { scanCard, downloadVCard } from "@/lib/api";
 import { saveContact } from "@/components/ContactHistory";
-import Scanner from "@/components/Scanner";
+import dynamic from "next/dynamic";
+const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
 import CardCapture from "@/components/CardCapture";
 import ContactPreview from "@/components/ContactPreview";
 import ContactHistory from "@/components/ContactHistory";
@@ -23,13 +24,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
 
-  const handleQRScan = useCallback(
-    (scannedContact: ContactData) => {
-      setContact(scannedContact);
-      setState("preview");
-    },
-    []
-  );
+  const handleQRScan = useCallback((scannedContact: ContactData) => {
+    setContact(scannedContact);
+    setState("preview");
+  }, []);
 
   const handleCardCapture = async (imageBase64: string) => {
     setState("loading");
@@ -40,11 +38,11 @@ export default function Home() {
         setContact(result.contact);
         setState("preview");
       } else {
-        setError(result.error || "Nao foi possivel extrair os dados do cartao");
+        setError(result.error || "Nao foi possivel extrair os dados do cartão");
         setState("home");
       }
     } catch (err) {
-      console.error("Erro ao escanear cartao:", err);
+      console.error("Erro ao escanear cartão:", err);
       setError("Erro de conexao com o servidor");
       setState("home");
     }
@@ -81,9 +79,9 @@ export default function Home() {
 
   if (state === "loading") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f0f1a] px-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-        <p className="mt-4 text-lg text-slate-400">Extraindo dados...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <p className="mt-4 text-lg text-slate-500">Analisando cartão...</p>
       </div>
     );
   }
@@ -100,10 +98,10 @@ export default function Home() {
 
   if (state === "success") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f0f1a] px-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/20">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
           <svg
-            className="h-10 w-10 text-green-500"
+            className="h-10 w-10 text-emerald-600"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -116,7 +114,7 @@ export default function Home() {
             />
           </svg>
         </div>
-        <p className="mt-4 text-xl font-semibold text-white">
+        <p className="mt-4 text-xl font-semibold text-slate-800">
           Contato salvo!
         </p>
       </div>
@@ -124,21 +122,18 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] px-4 py-8 pb-20">
+    <div className="min-h-screen bg-[#F8FAFC] px-4 py-8 pb-20">
       <header className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-white">Heitor Scanner</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Heitor Scanner</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Escaneie QR Codes e cartoes de visita
+          Escaneie contatos rapidamente
         </p>
       </header>
 
       {error && (
-        <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400 text-center">
+        <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-center">
           {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 underline"
-          >
+          <button onClick={() => setError(null)} className="ml-2 underline">
             Fechar
           </button>
         </div>
@@ -147,11 +142,11 @@ export default function Home() {
       <div className="space-y-4 mb-8">
         <button
           onClick={() => setState("scanning_qr")}
-          className="flex w-full items-center gap-4 rounded-2xl bg-[#1a1a2e] border border-[#2a2a3e] p-6 active:bg-[#252540] transition-colors"
+          className="flex w-full items-center gap-4 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm active:bg-slate-50 transition-colors"
         >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
             <svg
-              className="h-7 w-7 text-indigo-400"
+              className="h-7 w-7 text-indigo-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -171,20 +166,20 @@ export default function Home() {
             </svg>
           </div>
           <div className="text-left">
-            <p className="text-lg font-semibold text-white">QR Code</p>
-            <p className="text-sm text-slate-500">
-              Escaneie em tempo real com a camera
+            <p className="text-lg font-semibold text-slate-800">
+              Escanear QR Code
             </p>
+            <p className="text-sm text-slate-500">Aponte para um codigo QR</p>
           </div>
         </button>
 
         <button
           onClick={() => setState("capturing_card")}
-          className="flex w-full items-center gap-4 rounded-2xl bg-[#1a1a2e] border border-[#2a2a3e] p-6 active:bg-[#252540] transition-colors"
+          className="flex w-full items-center gap-4 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm active:bg-slate-50 transition-colors"
         >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
             <svg
-              className="h-7 w-7 text-indigo-400"
+              className="h-7 w-7 text-indigo-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -204,7 +199,9 @@ export default function Home() {
             </svg>
           </div>
           <div className="text-left">
-            <p className="text-lg font-semibold text-white">Cartao de Visita</p>
+            <p className="text-lg font-semibold text-slate-800">
+              Cartão de Visita
+            </p>
             <p className="text-sm text-slate-500">
               Tire uma foto e extraia os dados
             </p>

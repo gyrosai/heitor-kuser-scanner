@@ -42,7 +42,7 @@ export default function ContactHistory() {
 
   if (contacts.length === 0) {
     return (
-      <div className="rounded-2xl bg-[#1a1a2e] border border-[#2a2a3e] p-6 text-center">
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 text-center">
         <p className="text-slate-500">Nenhum contato escaneado ainda</p>
       </div>
     );
@@ -51,8 +51,8 @@ export default function ContactHistory() {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-slate-400">Contatos da sessao</h3>
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-500/20 px-2 text-xs font-semibold text-indigo-400">
+        <h3 className="text-sm font-medium text-slate-500">Contatos recentes</h3>
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-50 px-2 text-xs font-semibold text-indigo-600">
           {contacts.length}
         </span>
       </div>
@@ -62,20 +62,20 @@ export default function ContactHistory() {
             key={i}
             onClick={() => handleDownload(contact, i)}
             disabled={downloading === i}
-            className="flex w-full items-center gap-3 rounded-2xl bg-[#1a1a2e] border border-[#2a2a3e] p-4 text-left active:bg-[#252540] transition-colors"
+            className="flex w-full items-center gap-3 rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-left active:bg-slate-50 transition-colors"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-sm font-semibold text-indigo-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
               {contact.name?.[0]?.toUpperCase() || "?"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-white">
+              <p className="truncate font-medium text-slate-800">
                 {contact.name || "Sem nome"}
               </p>
               <p className="truncate text-sm text-slate-500">
                 {contact.company || contact.email || contact.phone || ""}
               </p>
             </div>
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-slate-400">
               {new Date(contact.savedAt).toLocaleTimeString("pt-BR", {
                 hour: "2-digit",
                 minute: "2-digit",

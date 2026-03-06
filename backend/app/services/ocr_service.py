@@ -30,6 +30,9 @@ Regras:
 
 async def extract_contact_from_card(image_base64: str) -> ContactData:
     """Usa GPT-4o Vision para extrair dados de contato de foto de cartão."""
+    if image_base64.startswith("data:"):
+        image_base64 = image_base64.split(",", 1)[1]
+
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
     try:
