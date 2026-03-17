@@ -22,6 +22,15 @@ export async function scanCard(imageBase64: string): Promise<ScanResponse> {
   return res.json();
 }
 
+export async function checkGoogleStatus(): Promise<{connected: boolean; email?: string}> {
+  const response = await fetch(`${API_URL}/api/auth/google/status`);
+  return response.json();
+}
+
+export function connectGoogle(): void {
+  window.location.href = `${API_URL}/api/auth/google`;
+}
+
 export async function downloadVCard(contact: ContactData): Promise<void> {
   const res = await fetch(`${API_URL}/api/vcard`, {
     method: "POST",
