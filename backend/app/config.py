@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     ENV: str = "development"
     PORT: int = 8000
     DATABASE_URL: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+    FRONTEND_URL: str = ""
 
     @property
     def origins_list(self) -> List[str]:

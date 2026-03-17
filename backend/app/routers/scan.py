@@ -7,7 +7,7 @@ from fastapi.responses import Response
 
 from app.database import get_db
 from app.models import ContactData, ScanRequest, ScanResponse
-from app.services import ocr_service, qrcode_service, vcard_service
+from app.services import google_contacts_service, ocr_service, qrcode_service, vcard_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def _save_contact(
     contact: ContactData,
     raw_qr_data: Optional[str] = None,
 ):
-    """Salva contato no banco. Nunca levanta exceção — apenas loga erros."""
+    """Salva contato no banco e no Google Contacts. Nunca levanta exceção."""
     if db is None:
         return
     try:
@@ -41,6 +41,12 @@ async def _save_contact(
         await db.commit()
         await db.refresh(db_contact)
         logger.info("Contato salvo no banco: id=%s name=%s", db_contact.id, db_contact.name)
+
+        # Google Contacts — best effort
+        google_resource = await google_contacts_service.save_to_google_contacts(contact, db)
+        if google_resource:
+            db_contact.google_contact_id = google_resource
+            await db.commit()
     except Exception as e:
         logger.error("Erro ao salvar contato no banco: %s", e)
 

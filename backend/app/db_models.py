@@ -20,3 +20,16 @@ class ScannedContact(Base):
     scanned_at = Column(DateTime(timezone=True), server_default=func.now())
     raw_qr_data = Column(Text, nullable=True)
     google_contact_id = Column(String(255), nullable=True)
+
+
+class GoogleAuth(Base):
+    __tablename__ = "google_auth"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_email = Column(String(255), nullable=False, unique=True)
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=False)
+    token_expiry = Column(DateTime(timezone=True), nullable=True)
+    scopes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
