@@ -1,0 +1,22 @@
+from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy.sql import func
+
+from app.database import Base
+
+
+class ScannedContact(Base):
+    __tablename__ = "scanned_contacts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    company = Column(String(255), nullable=True)
+    role = Column(String(255), nullable=True)
+    website = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
+    source = Column(String(20), default="card_photo")
+    event_tag = Column(String(100), nullable=True)
+    scanned_at = Column(DateTime(timezone=True), server_default=func.now())
+    raw_qr_data = Column(Text, nullable=True)
+    google_contact_id = Column(String(255), nullable=True)

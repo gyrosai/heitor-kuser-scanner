@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*"
     ENV: str = "development"
     PORT: int = 8000
+    DATABASE_URL: str = ""
 
     @property
     def origins_list(self) -> List[str]:
