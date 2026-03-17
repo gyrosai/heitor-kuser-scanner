@@ -1,17 +1,18 @@
-import logging
 import os
-
-os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
-
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+import httpx
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
-from google_auth_oauthlib.flow import Flow
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy import select
+from google_auth_oauthlib.flow import Flow
 from app.config import settings
 from app.database import get_db
 from app.db_models import GoogleAuth
+
+# Relaxar validação de scope — Google adiciona "openid" automaticamente
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth")
@@ -24,7 +25,6 @@ SCOPES = [
 
 
 def create_flow() -> Flow:
-    """Cria o flow OAuth do Google."""
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -41,7 +41,6 @@ def create_flow() -> Flow:
 
 @router.get("/google")
 async def google_auth():
-    """Inicia o fluxo OAuth — redireciona pro Google."""
     flow = create_flow()
     auth_url, _ = flow.authorization_url(
         access_type="offline",
@@ -53,29 +52,25 @@ async def google_auth():
 
 @router.get("/google/callback")
 async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
-    """Callback do OAuth — recebe o code e troca por tokens."""
     try:
+        # 1. Trocar code por tokens
         flow = create_flow()
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
         if not credentials.refresh_token:
-            raise HTTPException(
-                status_code=400,
-                detail="Não recebeu refresh_token. Tente desconectar o app em myaccount.google.com e reconectar.",
-            )
+            logger.warning("Não recebeu refresh_token")
 
-        # Descobrir email do usuário via userinfo endpoint
-        import httpx
-
-        userinfo_response = httpx.get(
+        # 2. Buscar email via userinfo (NÃO usar People API aqui)
+        userinfo_resp = httpx.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
         )
-        userinfo = userinfo_response.json()
+        userinfo = userinfo_resp.json()
         email = userinfo.get("email", "unknown")
+        logger.info("Google OAuth sucesso para: %s", email)
 
-        # Salvar ou atualizar no banco
+        # 3. Salvar tokens no banco
         result = await db.execute(
             select(GoogleAuth).where(GoogleAuth.user_email == email)
         )
@@ -83,43 +78,38 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 
         if existing:
             existing.access_token = credentials.token
-            existing.refresh_token = credentials.refresh_token
+            if credentials.refresh_token:
+                existing.refresh_token = credentials.refresh_token
             existing.token_expiry = credentials.expiry
-            existing.scopes = ",".join(credentials.scopes or [])
+            existing.scopes = " ".join(credentials.scopes or [])
         else:
             auth = GoogleAuth(
                 user_email=email,
                 access_token=credentials.token,
-                refresh_token=credentials.refresh_token,
+                refresh_token=credentials.refresh_token or "",
                 token_expiry=credentials.expiry,
-                scopes=",".join(credentials.scopes or []),
+                scopes=" ".join(credentials.scopes or []),
             )
             db.add(auth)
 
         await db.commit()
-        logger.info("Google auth salvo para: %s", email)
+        logger.info("Tokens salvos no banco para: %s", email)
 
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}?google_connected=true")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Erro no callback OAuth: %s", e)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}?google_error={str(e)}"
+            url=f"{settings.FRONTEND_URL}?google_connected=true"
+        )
+
+    except Exception as e:
+        logger.error("Erro no callback OAuth: %s", e, exc_info=True)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}?google_error={str(e)[:100]}"
         )
 
 
 @router.get("/google/status")
 async def google_status(db: AsyncSession = Depends(get_db)):
-    """Verifica se tem uma conta Google conectada."""
-    if db is None:
-        return {"connected": False}
     result = await db.execute(select(GoogleAuth).limit(1))
     auth = result.scalar_one_or_none()
     if auth:
-        return {
-            "connected": True,
-            "email": auth.user_email,
-        }
+        return {"connected": True, "email": auth.user_email}
     return {"connected": False}
