@@ -7,7 +7,7 @@ from fastapi.responses import Response
 
 from app.database import get_db
 from app.models import ContactData, ScanRequest, ScanResponse
-from app.services import google_contacts_service, ocr_service, qrcode_service, vcard_service
+from app.services import ocr_service, qrcode_service, vcard_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def _save_contact(
     contact: ContactData,
     raw_qr_data: Optional[str] = None,
 ):
-    """Salva contato no banco e no Google Contacts. Nunca levanta exceção."""
+    """Salva contato no banco. Nunca levanta exceção."""
     if db is None:
         return
     try:
@@ -41,12 +41,6 @@ async def _save_contact(
         await db.commit()
         await db.refresh(db_contact)
         logger.info("Contato salvo no banco: id=%s name=%s", db_contact.id, db_contact.name)
-
-        # Google Contacts — best effort
-        google_resource = await google_contacts_service.save_to_google_contacts(contact, db)
-        if google_resource:
-            db_contact.google_contact_id = google_resource
-            await db.commit()
     except Exception as e:
         logger.error("Erro ao salvar contato no banco: %s", e)
 
@@ -94,10 +88,20 @@ async def scan_card(request: ScanRequest, db=Depends(get_db)) -> ScanResponse:
 
 
 @router.post("/vcard")
-async def create_vcard(contact: ContactData) -> Response:
-    """Gera arquivo vCard (.vcf) para download."""
+async def create_vcard(contact: ContactData, db=Depends(get_db)) -> Response:
+    """Gera vCard E salva no Google Contacts."""
     vcard_str = vcard_service.generate_vcard(contact)
-    filename = contact.name.replace(" ", "_")
+    filename = (contact.name or "contato").replace(" ", "_")
+
+    # Salvar no Google Contacts (best effort, não bloqueia)
+    try:
+        from app.services import google_contacts_service
+
+        google_resource = await google_contacts_service.save_to_google_contacts(contact, db)
+        if google_resource:
+            logger.info("Contato salvo no Google Contacts: %s", contact.name)
+    except Exception as e:
+        logger.error("Erro ao salvar no Google Contacts: %s", e)
 
     return Response(
         content=vcard_str,
