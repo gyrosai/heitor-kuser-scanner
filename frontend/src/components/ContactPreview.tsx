@@ -92,14 +92,14 @@ export default function ContactPreview({
         <button
           onClick={handleSave}
           disabled={!form.name?.trim()}
-          className="w-full rounded-xl bg-indigo-600 py-[14px] text-lg font-semibold text-white disabled:opacity-40 active:bg-indigo-700 transition-colors"
+          className="w-full rounded-xl bg-[#FA6801] py-[14px] text-lg font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
           style={{ minHeight: 52 }}
         >
           Salvar Contato
         </button>
         <button
           onClick={onReset}
-          className="w-full rounded-xl border border-indigo-200 bg-white py-[14px] text-lg font-semibold text-indigo-600 active:bg-indigo-50 transition-colors"
+          className="w-full rounded-xl border border-[#FA6801]/30 bg-white py-[14px] text-lg font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors"
           style={{ minHeight: 52 }}
         >
           Escanear Outro
@@ -133,7 +133,7 @@ function Field({
         className={`w-full rounded-xl border bg-white px-4 py-3 text-slate-800 outline-none transition-colors ${
           isEmpty
             ? "border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-            : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            : "border-slate-200 focus:border-[#FA6801] focus:ring-2 focus:ring-[#FA6801]/20"
         }`}
       />
     </div>

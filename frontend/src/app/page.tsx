@@ -108,7 +108,7 @@ export default function Home() {
   if (state === "loading") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
         <p className="mt-4 text-lg text-slate-500">Analisando cartão...</p>
       </div>
     );
@@ -172,9 +172,9 @@ export default function Home() {
           onClick={() => setState("scanning_qr")}
           className="flex w-full items-center gap-4 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm active:bg-slate-50 transition-colors"
         >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#FFF3EB]">
             <svg
-              className="h-7 w-7 text-indigo-600"
+              className="h-7 w-7 text-[#FA6801]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -205,9 +205,9 @@ export default function Home() {
           onClick={() => setState("capturing_card")}
           className="flex w-full items-center gap-4 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm active:bg-slate-50 transition-colors"
         >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#FFF3EB]">
             <svg
-              className="h-7 w-7 text-indigo-600"
+              className="h-7 w-7 text-[#FA6801]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

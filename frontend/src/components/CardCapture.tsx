@@ -105,7 +105,7 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
         {sending ? (
           <>
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
             <p className="text-lg text-slate-500">Analisando cartão...</p>
           </>
         ) : preview ? (
@@ -122,13 +122,13 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
             <div className="flex w-full max-w-sm gap-3">
               <button
                 onClick={handleRetake}
-                className="flex-1 rounded-xl border border-indigo-200 bg-white py-4 text-lg font-semibold text-indigo-600 active:bg-indigo-50 transition-colors"
+                className="flex-1 rounded-xl border border-[#FA6801]/30 bg-white py-4 text-lg font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors"
               >
                 Tirar Outra
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 rounded-xl bg-indigo-600 py-4 text-lg font-semibold text-white active:bg-indigo-700 transition-colors"
+                className="flex-1 rounded-xl bg-[#FA6801] py-4 text-lg font-semibold text-white active:bg-[#E55D00] transition-colors"
               >
                 Enviar
               </button>
@@ -136,9 +136,9 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
           </>
         ) : (
           <>
-            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-indigo-50 border border-indigo-100">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[#FFF3EB] border border-[#FA6801]/20">
               <svg
-                className="h-16 w-16 text-indigo-600"
+                className="h-16 w-16 text-[#FA6801]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -173,7 +173,7 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
 
             <button
               onClick={() => inputRef.current?.click()}
-              className="w-full max-w-xs rounded-xl bg-indigo-600 py-5 text-lg font-semibold text-white active:bg-indigo-700 transition-colors"
+              className="w-full max-w-xs rounded-xl bg-[#FA6801] py-5 text-lg font-semibold text-white active:bg-[#E55D00] transition-colors"
               style={{ minHeight: 52 }}
             >
               Abrir Camera

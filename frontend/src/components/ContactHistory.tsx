@@ -52,7 +52,7 @@ export default function ContactHistory() {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-medium text-slate-500">Contatos recentes</h3>
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-50 px-2 text-xs font-semibold text-indigo-600">
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[#FFF3EB] px-2 text-xs font-semibold text-[#FA6801]">
           {contacts.length}
         </span>
       </div>
@@ -64,7 +64,7 @@ export default function ContactHistory() {
             disabled={downloading === i}
             className="flex w-full items-center gap-3 rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-left active:bg-slate-50 transition-colors"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF3EB] text-sm font-semibold text-[#FA6801]">
               {contact.name?.[0]?.toUpperCase() || "?"}
             </div>
             <div className="min-w-0 flex-1">
