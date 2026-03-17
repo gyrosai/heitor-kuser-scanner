@@ -1,4 +1,7 @@
 import logging
+import os
+
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
@@ -14,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth")
 
 SCOPES = [
+    "openid",
     "https://www.googleapis.com/auth/contacts",
     "https://www.googleapis.com/auth/userinfo.email",
 ]
