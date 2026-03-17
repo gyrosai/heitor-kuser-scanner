@@ -65,17 +65,15 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
                 detail="Não recebeu refresh_token. Tente desconectar o app em myaccount.google.com e reconectar.",
             )
 
-        # Descobrir email do usuário
-        from googleapiclient.discovery import build
+        # Descobrir email do usuário via userinfo endpoint
+        import httpx
 
-        service = build("people", "v1", credentials=credentials)
-        profile = (
-            service.people()
-            .get(resourceName="people/me", personFields="emailAddresses")
-            .execute()
+        userinfo_response = httpx.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {credentials.token}"},
         )
-
-        email = profile.get("emailAddresses", [{}])[0].get("value", "unknown")
+        userinfo = userinfo_response.json()
+        email = userinfo.get("email", "unknown")
 
         # Salvar ou atualizar no banco
         result = await db.execute(
