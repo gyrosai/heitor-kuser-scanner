@@ -13,7 +13,10 @@ from app.db_models import GoogleAuth
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth")
 
-SCOPES = ["https://www.googleapis.com/auth/contacts"]
+SCOPES = [
+    "https://www.googleapis.com/auth/contacts",
+    "https://www.googleapis.com/auth/userinfo.email",
+]
 
 
 def create_flow() -> Flow:
