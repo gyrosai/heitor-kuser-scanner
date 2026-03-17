@@ -112,6 +112,58 @@ async def create_vcard(contact: ContactData, db=Depends(get_db)) -> Response:
     )
 
 
+@router.post("/contacts/import-batch")
+async def import_batch(
+    contacts: list[ContactData],
+    db=Depends(get_db),
+):
+    """Importa lista de contatos para o Google Contacts em lote."""
+    from app.db_models import ScannedContact
+    from app.services import google_contacts_service
+
+    results = []
+    for i, contact in enumerate(contacts):
+        try:
+            db_contact = ScannedContact(
+                name=contact.name,
+                phone=contact.phone,
+                email=contact.email,
+                company=contact.company,
+                role=contact.role,
+                website=contact.website,
+                source="import",
+                event_tag=contact.event_tag or "MIPIM 2026",
+            )
+            db.add(db_contact)
+            await db.commit()
+
+            resource = await google_contacts_service.save_to_google_contacts(contact, db)
+            results.append({
+                "index": i + 1,
+                "name": contact.name,
+                "status": "ok" if resource else "db_only",
+                "google_id": resource,
+            })
+            logger.info("Importado %d/%d: %s", i + 1, len(contacts), contact.name)
+
+        except Exception as e:
+            logger.error("Erro ao importar %s: %s", contact.name, e)
+            results.append({
+                "index": i + 1,
+                "name": contact.name,
+                "status": "error",
+                "error": str(e),
+            })
+
+    ok = len([r for r in results if r["status"] == "ok"])
+    return {
+        "total": len(contacts),
+        "success": ok,
+        "failed": len(contacts) - ok,
+        "results": results,
+    }
+
+
 @router.get("/contacts")
 async def list_contacts(
     event_tag: Optional[str] = None,
