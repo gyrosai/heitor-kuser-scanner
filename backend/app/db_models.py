@@ -1,4 +1,5 @@
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, LargeBinary, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -20,6 +21,15 @@ class ScannedContact(Base):
     scanned_at = Column(DateTime(timezone=True), server_default=func.now())
     raw_qr_data = Column(Text, nullable=True)
     google_contact_id = Column(String(255), nullable=True)
+    importance = Column(Integer, nullable=True)
+    tags = Column(ARRAY(String), nullable=False, server_default="{}")
+    card_image = Column(LargeBinary, nullable=True)
+    is_draft = Column(Boolean, nullable=False, server_default="true")
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 class GoogleAuth(Base):
