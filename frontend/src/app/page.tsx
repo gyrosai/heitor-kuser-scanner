@@ -1,14 +1,28 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { ContactData } from "@/lib/types";
-import { scanCard, downloadVCard, checkGoogleStatus, connectGoogle } from "@/lib/api";
-import { saveContact } from "@/components/ContactHistory";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
+import {
+  ApiConflictError,
+  ConflictError,
+  ContactData,
+} from "@/lib/types";
+import {
+  checkGoogleStatus,
+  connectGoogle,
+  disconnectGoogle,
+  mergeContact,
+  saveContact,
+  scanCard,
+} from "@/lib/api";
+import { useToast } from "@/components/Toast";
 import CardCapture from "@/components/CardCapture";
-import ContactPreview from "@/components/ContactPreview";
+import ContactEditor from "@/components/ContactEditor";
 import ContactHistory from "@/components/ContactHistory";
+import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
+import DuplicateModal from "@/components/DuplicateModal";
+
+const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
 
 type AppState =
   | "home"
@@ -16,16 +30,21 @@ type AppState =
   | "capturing_card"
   | "loading"
   | "preview"
+  | "showing_duplicate"
+  | "editing"
   | "success";
 
 export default function Home() {
+  const { showToast } = useToast();
   const [state, setState] = useState<AppState>("home");
   const [contact, setContact] = useState<ContactData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [contactId, setContactId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [conflict, setConflict] = useState<ConflictError | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState<string | undefined>();
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     checkGoogleStatus()
@@ -37,68 +56,176 @@ export default function Home() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_connected") === "true") {
-      setToast({ message: "Google Contacts conectado com sucesso!", type: "success" });
+      showToast("Google Contacts conectado com sucesso!", "success");
       setGoogleConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("google_error")) {
-      setToast({ message: "Erro ao conectar. Tente novamente.", type: "error" });
+      showToast("Erro ao conectar com Google. Tente novamente.", "error");
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, []);
+  }, [showToast]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  const handleQRScan = useCallback((scannedContact: ContactData) => {
+  const handleQRScan = useCallback((scannedContact: ContactData, scannedId?: number) => {
     setContact(scannedContact);
+    setContactId(scannedId ?? null);
     setState("preview");
   }, []);
 
   const handleCardCapture = async (imageBase64: string) => {
     setState("loading");
-    setError(null);
     try {
       const result = await scanCard(imageBase64);
       if (result.success && result.contact) {
         setContact(result.contact);
+        setContactId(result.contact_id ?? null);
         setState("preview");
       } else {
-        setError(result.error || "Nao foi possivel extrair os dados do cartão");
+        showToast(
+          result.error || "Não foi possível extrair os dados do cartão",
+          "error",
+        );
         setState("home");
       }
     } catch (err) {
       console.error("Erro ao escanear cartão:", err);
-      setError("Erro de conexao com o servidor");
+      showToast(
+        err instanceof Error ? err.message : "Erro de conexão com o servidor",
+        "error",
+      );
       setState("home");
     }
   };
 
-  const handleSave = async (editedContact: ContactData) => {
-    saveContact(editedContact);
+  const performSave = useCallback(
+    async (editedContact: ContactData, force: boolean) => {
+      setSaving(true);
+      try {
+        await saveContact(editedContact, contactId ?? undefined, force);
+        if (editedContact.event_tag) {
+          try {
+            localStorage.setItem(LAST_EVENT_KEY, editedContact.event_tag);
+          } catch {}
+        }
+        setState("success");
+        setHistoryKey((k) => k + 1);
+        setTimeout(() => {
+          setState("home");
+          setContact(null);
+          setContactId(null);
+          setConflict(null);
+        }, 1600);
+      } catch (err) {
+        if (err instanceof ApiConflictError) {
+          setConflict(err.conflict);
+          setState("showing_duplicate");
+          return;
+        }
+        console.error("Erro ao salvar contato:", err);
+        showToast(
+          err instanceof Error ? err.message : "Erro ao salvar contato",
+          "error",
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [contactId, showToast],
+  );
+
+  const handleSave = (editedContact: ContactData) => {
+    setContact(editedContact);
+    void performSave(editedContact, false);
+  };
+
+  const handleMerge = async () => {
+    if (!conflict || !contact) return;
+    setSaving(true);
     try {
-      await downloadVCard(editedContact);
-    } catch (err) {
-      console.error("Erro ao gerar vCard:", err);
-    }
-    setState("success");
-    setHistoryKey((k) => k + 1);
-    setTimeout(() => {
+      await mergeContact(conflict.existing_id, contact);
+      if (contact.event_tag) {
+        try {
+          localStorage.setItem(LAST_EVENT_KEY, contact.event_tag);
+        } catch {}
+      }
+      showToast("Contato atualizado com sucesso", "success");
+      setHistoryKey((k) => k + 1);
       setState("home");
       setContact(null);
-    }, 2000);
+      setContactId(null);
+      setConflict(null);
+    } catch (err) {
+      console.error("Erro ao mesclar contato:", err);
+      showToast(
+        err instanceof Error ? err.message : "Erro ao atualizar contato",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleForceCreate = () => {
+    if (!contact) return;
+    void performSave(contact, true);
+  };
+
+  const handleDuplicateCancel = () => {
+    setConflict(null);
+    setState("preview");
   };
 
   const handleReset = () => {
     setState("home");
     setContact(null);
-    setError(null);
+    setContactId(null);
+    setConflict(null);
+  };
+
+  const handleDisconnect = async () => {
+    const ok = confirm(
+      "Desconectar Google? Os contatos já salvos permanecem, mas novos scans não serão sincronizados até alguém reconectar.",
+    );
+    if (!ok) return;
+    try {
+      await disconnectGoogle();
+      setGoogleConnected(false);
+      setGoogleEmail(undefined);
+      showToast("Google desconectado", "success");
+    } catch (e) {
+      console.error("Erro ao desconectar:", e);
+      showToast("Erro ao desconectar do Google", "error");
+    }
+  };
+
+  const handleOpenContact = (id: number) => {
+    setEditingId(id);
+    setState("editing");
+  };
+
+  const handleEditorClose = () => {
+    setEditingId(null);
+    setState("home");
+  };
+
+  const handleEditorSaved = () => {
+    setEditingId(null);
+    setHistoryKey((k) => k + 1);
+    setState("home");
+  };
+
+  const handleEditorDeleted = () => {
+    setEditingId(null);
+    setHistoryKey((k) => k + 1);
+    setState("home");
   };
 
   if (state === "scanning_qr") {
-    return <Scanner onScan={handleQRScan} onClose={handleReset} />;
+    return (
+      <Scanner
+        onScan={(c) => handleQRScan(c)}
+        onClose={handleReset}
+      />
+    );
   }
 
   if (state === "capturing_card") {
@@ -116,10 +243,45 @@ export default function Home() {
 
   if (state === "preview" && contact) {
     return (
-      <ContactPreview
-        contact={contact}
-        onSave={handleSave}
-        onReset={handleReset}
+      <>
+        {googleConnected && googleEmail && (
+          <AccountBanner
+            email={googleEmail}
+            onSwitch={handleDisconnect}
+            sticky
+          />
+        )}
+        <ContactPreview
+          contact={contact}
+          contactId={contactId ?? undefined}
+          onSave={handleSave}
+          onReset={handleReset}
+          saving={saving}
+        />
+      </>
+    );
+  }
+
+  if (state === "showing_duplicate" && conflict && contact) {
+    return (
+      <DuplicateModal
+        existing={conflict.existing}
+        newContact={contact}
+        onMerge={handleMerge}
+        onForceCreate={handleForceCreate}
+        onCancel={handleDuplicateCancel}
+        busy={saving}
+      />
+    );
+  }
+
+  if (state === "editing" && editingId != null) {
+    return (
+      <ContactEditor
+        contactId={editingId}
+        onClose={handleEditorClose}
+        onSaved={handleEditorSaved}
+        onDeleted={handleEditorDeleted}
       />
     );
   }
@@ -151,21 +313,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-4 py-8 pb-20">
+      {googleConnected && googleEmail && (
+        <AccountBanner email={googleEmail} onSwitch={handleDisconnect} />
+      )}
+
       <header className="mb-8 text-center">
         <h1 className="text-2xl font-bold text-slate-800">Heitor Scanner</h1>
         <p className="mt-1 text-sm text-slate-500">
           Escaneie contatos rapidamente
         </p>
       </header>
-
-      {error && (
-        <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-center">
-          {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">
-            Fechar
-          </button>
-        </div>
-      )}
 
       <div className="space-y-4 mb-8">
         <button
@@ -197,7 +354,7 @@ export default function Home() {
             <p className="text-lg font-semibold text-slate-800">
               Escanear QR Code
             </p>
-            <p className="text-sm text-slate-500">Aponte para um codigo QR</p>
+            <p className="text-sm text-slate-500">Aponte para um código QR</p>
           </div>
         </button>
 
@@ -237,31 +394,27 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Google Contacts */}
-      <div className="mb-8 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
-        {googleConnected ? (
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50">
-              <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-base font-semibold text-slate-800">Google Contacts conectado</p>
-              {googleEmail && (
-                <p className="mt-0.5 text-sm text-slate-500">{googleEmail}</p>
-              )}
-              <p className="mt-1 text-sm text-slate-400">Contatos são salvos automaticamente</p>
-            </div>
-          </div>
-        ) : (
+      {!googleConnected && (
+        <div className="mb-8 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
           <div className="flex flex-col items-center text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 mb-3">
-              <svg className="h-6 w-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+              <svg
+                className="h-6 w-6 text-slate-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
+                />
               </svg>
             </div>
-            <p className="text-base font-semibold text-slate-800">Google Contacts</p>
+            <p className="text-base font-semibold text-slate-800">
+              Google Contacts
+            </p>
             <p className="mt-1 text-sm text-slate-500 mb-4">
               Conecte para salvar contatos automaticamente na sua agenda
             </p>
@@ -270,31 +423,59 @@ export default function Home() {
               className="flex items-center gap-3 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-shadow hover:shadow-md"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
               </svg>
               Conectar com Google
             </button>
           </div>
-        )}
-      </div>
-
-      <ContactHistory key={historyKey} />
-
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-medium shadow-lg transition-opacity ${
-            toast.type === "success"
-              ? "bg-emerald-600 text-white"
-              : "bg-red-600 text-white"
-          }`}
-        >
-          {toast.message}
         </div>
       )}
+
+      <ContactHistory
+        refreshKey={historyKey}
+        onOpenContact={handleOpenContact}
+      />
+    </div>
+  );
+}
+
+function AccountBanner({
+  email,
+  onSwitch,
+  sticky = false,
+}: {
+  email: string;
+  onSwitch: () => void;
+  sticky?: boolean;
+}) {
+  return (
+    <div
+      className={`${sticky ? "sticky top-0 z-20" : ""} mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800 flex items-center justify-between gap-3`}
+    >
+      <span className="truncate">
+        💡 Salvando como: <span className="font-medium">{email}</span>
+      </span>
+      <button
+        onClick={onSwitch}
+        className="shrink-0 text-xs font-medium text-amber-900 underline"
+      >
+        Trocar conta
+      </button>
     </div>
   );
 }

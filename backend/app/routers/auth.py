@@ -3,7 +3,7 @@ import logging
 import httpx
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from google_auth_oauthlib.flow import Flow
@@ -113,3 +113,20 @@ async def google_status(db: AsyncSession = Depends(get_db)):
     if auth:
         return {"connected": True, "email": auth.user_email}
     return {"connected": False}
+
+
+@router.post("/google/disconnect", status_code=204)
+async def google_disconnect(db: AsyncSession = Depends(get_db)):
+    """Apaga todos os registros de google_auth. Não toca em scanned_contacts.
+
+    Permite trocar a conta Google ativa (single-account). Contatos já salvos
+    permanecem com seu google_contact_id antigo, mas novos scans não serão
+    sincronizados até alguém reconectar.
+    """
+    result = await db.execute(select(GoogleAuth))
+    rows = result.scalars().all()
+    for row in rows:
+        await db.delete(row)
+    await db.commit()
+    logger.info("Google desconectado: %d registros removidos", len(rows))
+    return Response(status_code=204)

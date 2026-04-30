@@ -774,6 +774,93 @@ async def merge_contact(
     return _contact_to_dict(db_contact)
 
 
+@router.get("/contacts/{contact_id}")
+async def get_contact(contact_id: int, db=Depends(get_db)):
+    """Retorna ContactRecord completo (sem bytes da imagem)."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado")
+
+    has_image_col = (ScannedContact.card_image.isnot(None)).label("has_image")
+    query = (
+        select(ScannedContact, has_image_col)
+        .where(ScannedContact.id == contact_id)
+        .options(defer(ScannedContact.card_image))
+    )
+    result = await db.execute(query)
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+    c = row[0]
+    return {
+        "id": c.id,
+        "name": c.name,
+        "phone": c.phone,
+        "email": c.email,
+        "company": c.company,
+        "role": c.role,
+        "website": c.website,
+        "notes": c.notes,
+        "source": c.source,
+        "event_tag": c.event_tag,
+        "scanned_at": c.scanned_at.isoformat() if c.scanned_at else None,
+        "importance": c.importance,
+        "tags": list(c.tags or []),
+        "is_draft": c.is_draft,
+        "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        "has_image": bool(row[1]),
+        "google_contact_id": c.google_contact_id,
+    }
+
+
+@router.post("/contacts/{contact_id}/sync-google")
+async def sync_contact_google(contact_id: int, db=Depends(get_db)):
+    """Sincroniza um contato com o Google Contacts (idempotente).
+
+    - Se ainda não tem google_contact_id: cria.
+    - Se já tem: atualiza.
+    - Sempre retorna {google_contact_id, synced}.
+    - 503 se Google não conectado.
+    """
+    if db is None:
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado")
+
+    result = await db.execute(
+        select(ScannedContact).where(ScannedContact.id == contact_id)
+    )
+    db_contact = result.scalar_one_or_none()
+    if db_contact is None:
+        raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+    from app.services import google_contacts_service
+
+    pydantic_contact = _contact_to_pydantic(db_contact)
+
+    if db_contact.google_contact_id:
+        ok = await google_contacts_service.update_google_contact(
+            pydantic_contact, db_contact.google_contact_id, db
+        )
+        if not ok:
+            raise HTTPException(
+                status_code=503,
+                detail="Falha ao atualizar no Google Contacts (verifique conexão)",
+            )
+        return {"google_contact_id": db_contact.google_contact_id, "synced": True}
+
+    resource_name = await google_contacts_service.save_to_google_contacts(
+        pydantic_contact, db
+    )
+    if not resource_name:
+        raise HTTPException(
+            status_code=503,
+            detail="Google Contacts não conectado ou falha ao salvar",
+        )
+
+    db_contact.google_contact_id = resource_name
+    await db.commit()
+    return {"google_contact_id": resource_name, "synced": True}
+
+
 @router.get("/contacts/{contact_id}/image")
 async def get_contact_image(contact_id: int, db=Depends(get_db)):
     """Retorna a foto do cartão como JPEG. 404 se não tiver."""

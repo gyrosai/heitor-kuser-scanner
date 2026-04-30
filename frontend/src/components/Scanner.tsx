@@ -81,6 +81,8 @@ export function parseQRText(text: string): ContactData | null {
     notes: null,
     source: "qrcode",
     event_tag: null,
+    importance: null,
+    tags: [],
     incomplete: !parsed.name,
   };
 }
@@ -131,6 +133,8 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
                 notes: decodedText,
                 source: "qrcode",
                 event_tag: null,
+                importance: null,
+                tags: [],
                 incomplete: true,
               },
               decodedText

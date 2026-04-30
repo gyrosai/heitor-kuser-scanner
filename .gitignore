@@ -21,3 +21,6 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Database backups (gerados pelo pg_dump localmente)
+backup_*.sql
