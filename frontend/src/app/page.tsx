@@ -15,12 +15,18 @@ import {
   saveContact,
   scanCard,
 } from "@/lib/api";
+import { countByStatus } from "@/lib/pendingScans";
 import { useToast } from "@/components/Toast";
+import BatchCapture from "@/components/BatchCapture";
 import CardCapture from "@/components/CardCapture";
 import ContactEditor from "@/components/ContactEditor";
 import ContactHistory from "@/components/ContactHistory";
 import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
 import DuplicateModal from "@/components/DuplicateModal";
+import ProcessingScreen from "@/components/ProcessingScreen";
+import QueueScreen from "@/components/QueueScreen";
+import ReviewCarousel from "@/components/ReviewCarousel";
+import ReviewListView from "@/components/ReviewListView";
 
 const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
 
@@ -32,7 +38,12 @@ type AppState =
   | "preview"
   | "showing_duplicate"
   | "editing"
-  | "success";
+  | "success"
+  | "batch_capture"
+  | "queue"
+  | "processing"
+  | "review_carousel"
+  | "review_list";
 
 export default function Home() {
   const { showToast } = useToast();
@@ -45,6 +56,23 @@ export default function Home() {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [reviewIndex, setReviewIndex] = useState(0);
+
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const c = await countByStatus();
+      setPendingCount(
+        c.captured + c.uploading + c.processed + c.error,
+      );
+    } catch {
+      setPendingCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPendingCount();
+  }, [refreshPendingCount, state]);
 
   useEffect(() => {
     checkGoogleStatus()
@@ -311,6 +339,76 @@ export default function Home() {
     );
   }
 
+  if (state === "batch_capture") {
+    return (
+      <BatchCapture
+        onClose={() => {
+          void refreshPendingCount();
+          setState("home");
+        }}
+        onProcess={() => setState("processing")}
+        onOpenQueue={() => setState("queue")}
+      />
+    );
+  }
+
+  if (state === "queue") {
+    return (
+      <QueueScreen
+        onClose={() => {
+          void refreshPendingCount();
+          setState("home");
+        }}
+        onProcess={() => setState("processing")}
+        onContinueReview={() => {
+          setReviewIndex(0);
+          setState("review_carousel");
+        }}
+      />
+    );
+  }
+
+  if (state === "processing") {
+    return (
+      <ProcessingScreen
+        onClose={() => {
+          void refreshPendingCount();
+          setState("queue");
+        }}
+        onDone={() => {
+          setReviewIndex(0);
+          setState("review_carousel");
+        }}
+      />
+    );
+  }
+
+  if (state === "review_carousel") {
+    return (
+      <ReviewCarousel
+        startIndex={reviewIndex}
+        onClose={() => {
+          void refreshPendingCount();
+          setHistoryKey((k) => k + 1);
+          setState("home");
+        }}
+        onOpenList={() => setState("review_list")}
+      />
+    );
+  }
+
+  if (state === "review_list") {
+    return (
+      <ReviewListView
+        onClose={() => setState("review_carousel")}
+        onPick={(idx) => {
+          setReviewIndex(idx);
+          setState("review_carousel");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-4 py-8 pb-20">
       {googleConnected && googleEmail && (
@@ -325,6 +423,48 @@ export default function Home() {
       </header>
 
       <div className="space-y-4 mb-8">
+        <button
+          onClick={() =>
+            setState(pendingCount > 0 ? "queue" : "batch_capture")
+          }
+          className="flex w-full items-center gap-4 rounded-2xl bg-[#FA6801] p-6 shadow-sm active:bg-[#E55D00] transition-colors text-white"
+        >
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <svg
+              className="h-7 w-7 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-lg font-semibold">📸 Modo Rajada</p>
+            <p className="text-sm text-white/80">
+              {pendingCount > 0
+                ? `${pendingCount} foto${pendingCount === 1 ? "" : "s"} na fila`
+                : "Tire várias fotos, processe depois"}
+            </p>
+          </div>
+          {pendingCount > 0 && (
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-white px-2 text-sm font-bold text-[#FA6801]">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={() => setState("scanning_qr")}
           className="flex w-full items-center gap-4 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm active:bg-slate-50 transition-colors"

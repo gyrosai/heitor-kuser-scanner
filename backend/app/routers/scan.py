@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import csv
 import io
@@ -11,9 +12,18 @@ from fastapi.responses import Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import defer
 
-from app.database import get_db
+from app.database import async_session, get_db
 from app.db_models import ScannedContact
-from app.models import ALLOWED_TAGS, ContactData, ScanRequest, ScanResponse
+from app.models import (
+    ALLOWED_TAGS,
+    BatchImageItem,
+    BatchResultItem,
+    BatchScanRequest,
+    BatchScanResponse,
+    ContactData,
+    ScanRequest,
+    ScanResponse,
+)
 from app.services import image_service, ocr_service, qrcode_service, vcard_service
 
 logger = logging.getLogger(__name__)
@@ -156,6 +166,58 @@ async def scan_card(request: ScanRequest, db=Depends(get_db)) -> ScanResponse:
             success=False,
             error=f"Erro ao processar cartão: {e}",
         )
+
+
+# TODO: Drafts órfãos (processados mas nunca salvos via /vcard) ficam
+# no banco indefinidamente. PR futuro: cleanup job ou botão "Descartar
+# drafts antigos" no QueueScreen.
+@router.post("/scan/batch", response_model=BatchScanResponse)
+async def scan_batch(request: BatchScanRequest) -> BatchScanResponse:
+    """Processa lote de cartões em paralelo (OCR + persist como draft).
+
+    Cada imagem roda em sessão de DB isolada — falhas individuais não
+    derrubam o batch. Concorrência interna limitada por semáforo.
+    """
+    if async_session is None:
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado")
+
+    semaphore = asyncio.Semaphore(5)
+
+    async def process_one(item: BatchImageItem) -> BatchResultItem:
+        async with semaphore:
+            try:
+                contact = await ocr_service.extract_contact_from_card(item.image_base64)
+                card_image = image_service.compress_card_image(item.image_base64)
+                # Sessão própria por task: AsyncSession não é task-safe, e
+                # commit/rollback de uma task não pode afetar as demais.
+                async with async_session() as task_db:
+                    contact_id = await _save_contact(
+                        task_db, contact, card_image=card_image
+                    )
+                if contact_id is None:
+                    return BatchResultItem(
+                        local_id=item.local_id,
+                        success=False,
+                        error="Falha ao persistir contato",
+                    )
+                return BatchResultItem(
+                    local_id=item.local_id,
+                    success=True,
+                    contact_id=contact_id,
+                    contact=contact,
+                )
+            except Exception as e:
+                logger.error(
+                    "Batch process erro local_id=%s: %s", item.local_id, e
+                )
+                return BatchResultItem(
+                    local_id=item.local_id,
+                    success=False,
+                    error=str(e),
+                )
+
+    results = await asyncio.gather(*[process_one(item) for item in request.images])
+    return BatchScanResponse(results=results)
 
 
 @router.post("/vcard")

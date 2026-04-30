@@ -1,5 +1,7 @@
 import {
   ApiConflictError,
+  BatchImageItem,
+  BatchScanResponse,
   ContactData,
   ContactRecord,
   EventInfo,
@@ -49,6 +51,17 @@ export async function scanCard(imageBase64: string): Promise<ScanResponse> {
     body: JSON.stringify({ image: imageBase64 }),
   });
   return jsonOrThrow<ScanResponse>(res);
+}
+
+export async function scanBatch(
+  items: BatchImageItem[],
+): Promise<BatchScanResponse> {
+  const res = await fetch(`${API_URL}/api/scan/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ images: items }),
+  });
+  return jsonOrThrow<BatchScanResponse>(res);
 }
 
 export async function checkGoogleStatus(): Promise<{

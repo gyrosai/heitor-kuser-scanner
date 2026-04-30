@@ -69,3 +69,24 @@ export class ApiConflictError extends Error {
     this.conflict = conflict;
   }
 }
+
+export interface BatchImageItem {
+  local_id: string;
+  image_base64: string;
+}
+
+export interface BatchScanRequest {
+  images: BatchImageItem[];
+}
+
+export interface BatchResultItem {
+  local_id: string;
+  success: boolean;
+  contact_id?: number | null;
+  contact?: ContactData | null;
+  error?: string | null;
+}
+
+export interface BatchScanResponse {
+  results: BatchResultItem[];
+}

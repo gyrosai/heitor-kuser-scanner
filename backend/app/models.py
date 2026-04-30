@@ -58,3 +58,24 @@ class ConflictResponse(BaseModel):
     existing: ContactData
     existing_id: int
     new: ContactData
+
+
+class BatchImageItem(BaseModel):
+    local_id: str = Field(..., min_length=1)
+    image_base64: str = Field(..., min_length=1)
+
+
+class BatchScanRequest(BaseModel):
+    images: list[BatchImageItem] = Field(..., min_length=1, max_length=10)
+
+
+class BatchResultItem(BaseModel):
+    local_id: str
+    success: bool
+    contact_id: Optional[int] = None
+    contact: Optional[ContactData] = None
+    error: Optional[str] = None
+
+
+class BatchScanResponse(BaseModel):
+    results: list[BatchResultItem]
