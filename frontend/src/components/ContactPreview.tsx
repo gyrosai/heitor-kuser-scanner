@@ -10,6 +10,7 @@ import {
   classificacoesToTags,
   tagsToClassificacoes,
 } from "@/lib/types";
+import { useToast } from "@/components/Toast";
 import {
   AppHeader,
   Banner,
@@ -57,6 +58,7 @@ export default function ContactPreview({
   onReset,
   saving = false,
 }: ContactPreviewProps) {
+  const { showToast } = useToast();
   const interestTags = (contact.tags ?? []).filter((t) => !isClassificationTag(t));
 
   const [form, setForm] = useState<ContactData>({
@@ -103,14 +105,21 @@ export default function ContactPreview({
     const classificationTags = classificacoesToTags(classificacao);
     const allTags = [...(form.tags || []), ...classificationTags];
 
+    const shouldSendEmail = emailEnabled && !quotaExhausted;
+
     const payload: ContactData = {
       ...form,
       name: form.name.trim(),
       event_tag: form.event_tag?.trim() || null,
       tags: allTags,
-      send_email: emailEnabled,
+      send_email: shouldSendEmail,
       email_language: emailLanguage,
     };
+
+    if (emailEnabled && quotaExhausted) {
+      showToast("Contato salvo. Envio do Mídia Kit indisponível (quota esgotada).", "info");
+    }
+
     onSave(payload);
   };
 

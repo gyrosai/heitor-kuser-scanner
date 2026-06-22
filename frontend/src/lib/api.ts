@@ -316,7 +316,12 @@ export async function sendMediaKit(
 
     if (res.status === 409) throw new Error("E-mail já enviado para este contato.");
     if (res.status === 422) throw new Error("Este contato não tem endereço de e-mail.");
-    if (res.status === 429) throw new Error("Cota de e-mails esgotada. Tente amanhã.");
+    if (res.status === 429) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("quota:exhausted"));
+      }
+      throw new Error("Cota de e-mails esgotada. Tente amanhã.");
+    }
     if (res.status === 502) throw new Error("Falha ao enviar pelo Gmail. Tente novamente.");
 
     const msg = typeof detail === "string" ? detail : `Erro ${res.status}`;

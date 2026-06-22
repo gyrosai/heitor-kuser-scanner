@@ -6,9 +6,10 @@ interface CheckboxProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   label?: string;
+  labelClassName?: string;
 }
 
-export function Checkbox({ checked, onChange, disabled, label }: CheckboxProps) {
+export function Checkbox({ checked, onChange, disabled, label, labelClassName }: CheckboxProps) {
   return (
     <button
       type="button"
@@ -31,7 +32,7 @@ export function Checkbox({ checked, onChange, disabled, label }: CheckboxProps) 
         {checked && <Check size={14} strokeWidth={3} className="text-white" />}
       </span>
       {label && (
-        <span className="text-sm font-semibold text-text-default">{label}</span>
+        <span className={clsx("text-sm font-semibold text-text-default", labelClassName)}>{label}</span>
       )}
     </button>
   );

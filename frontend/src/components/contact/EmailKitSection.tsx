@@ -111,20 +111,22 @@ export default function EmailKitSection({
   if (quotaExhausted) {
     return (
       <Section title="Mídia Kit por E-mail">
-        <Banner
-          variant="warning"
-          icon={<Clock size={16} className="text-warning-fg" />}
-          title="Cota diária esgotada"
-          description="Você atingiu o limite de e-mails de hoje. O envio será liberado amanhã."
-          actions={
-            <Checkbox
-              checked={false}
-              onChange={() => {}}
-              disabled
-              label="Enviar Mídia Kit"
-            />
-          }
-        />
+        <div className="flex flex-col gap-3">
+          <Banner
+            variant="warning"
+            icon={<Clock size={16} className="text-warning-fg" />}
+            title="Cota diária esgotada"
+            // TODO: adicionar reset_at no backend (check_daily_quota → EmailLog mais antigo) pra mostrar countdown preciso
+            description="Os envios reabrem conforme os e-mails do dia completarem 24h. Você pode salvar o contato sem enviar agora."
+          />
+          <Checkbox
+            checked={false}
+            onChange={() => {}}
+            disabled
+            label="Enviar Mídia Kit ao salvar — Indisponível"
+            labelClassName="line-through"
+          />
+        </div>
       </Section>
     );
   }

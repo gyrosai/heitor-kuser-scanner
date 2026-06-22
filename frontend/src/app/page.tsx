@@ -252,6 +252,12 @@ export default function Home() {
     return () => window.removeEventListener("oauth:expired", handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setEmailQuota((q) => q ? { ...q, remaining: 0 } : q);
+    window.addEventListener("quota:exhausted", handler);
+    return () => window.removeEventListener("quota:exhausted", handler);
+  }, []);
+
   const handleLogin = () => {
     setAuthLoading(true);
     connectGoogle(); // window.location.href descarrega a página — setAuthLoading(false) nunca executa
