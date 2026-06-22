@@ -378,6 +378,7 @@ export default function Home() {
           setReviewIndex(0);
           setState("review_carousel");
         }}
+        onCapture={() => setState("batch_capture")}
       />
     );
   }
