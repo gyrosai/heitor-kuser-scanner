@@ -319,6 +319,14 @@ export default function Home() {
         onClose={handleEditorClose}
         onSaved={handleEditorSaved}
         onDeleted={handleEditorDeleted}
+        senderEmail={
+          googleStatus.authenticated ? googleStatus.user_email : undefined
+        }
+        quotaExhausted={
+          emailQuota != null
+            ? emailQuota.remaining <= 0
+            : false
+        }
       />
     );
   }
