@@ -27,6 +27,7 @@ import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { AboutScreen } from "@/components/about/AboutScreen";
+import { OfflineBanner } from "@/components/system/OfflineBanner";
 import DuplicateModal from "@/components/DuplicateModal";
 import ProcessingScreen from "@/components/ProcessingScreen";
 import QueueScreen from "@/components/QueueScreen";
@@ -271,200 +272,209 @@ export default function Home() {
     setState("home");
   };
 
-  if (!googleStatus.authenticated) {
-    return <LoginScreen onLogin={handleLogin} loading={authLoading} />;
-  }
+  const renderContent = () => {
+    if (!googleStatus.authenticated) {
+      return <LoginScreen onLogin={handleLogin} loading={authLoading} />;
+    }
 
-  if (state === "about") {
-    return (
-      <AboutScreen
-        onBack={() => setState("home")}
-        version={appVersion}
-        userName={googleStatus.user_name}
-      />
-    );
-  }
+    if (state === "about") {
+      return (
+        <AboutScreen
+          onBack={() => setState("home")}
+          version={appVersion}
+          userName={googleStatus.user_name}
+        />
+      );
+    }
 
-  if (state === "scanning_qr") {
-    return (
-      <Scanner
-        onScan={(c) => handleQRScan(c)}
-        onClose={handleReset}
-      />
-    );
-  }
+    if (state === "scanning_qr") {
+      return (
+        <Scanner
+          onScan={(c) => handleQRScan(c)}
+          onClose={handleReset}
+        />
+      );
+    }
 
-  if (state === "capturing_card") {
-    return <CardCapture onCapture={handleCardCapture} onClose={handleReset} />;
-  }
+    if (state === "capturing_card") {
+      return <CardCapture onCapture={handleCardCapture} onClose={handleReset} />;
+    }
 
-  if (state === "loading") {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
-        <p className="mt-4 text-lg text-slate-500">Analisando cartão...</p>
-      </div>
-    );
-  }
-
-  if (state === "preview" && contact) {
-    return (
-      <ContactPreview
-        contact={contact}
-        contactId={contactId ?? undefined}
-        capturedDataUrl={capturedDataUrl ?? undefined}
-        senderEmail={
-          googleStatus.authenticated ? googleStatus.user_email : undefined
-        }
-        quotaExhausted={emailQuota != null ? emailQuota.remaining <= 0 : false}
-        onSave={handleSave}
-        onReset={handleReset}
-        saving={saving}
-      />
-    );
-  }
-
-  if (state === "showing_duplicate" && conflict && contact) {
-    return (
-      <DuplicateModal
-        existing={conflict.existing}
-        newContact={contact}
-        onMerge={handleMerge}
-        onForceCreate={handleForceCreate}
-        onCancel={handleDuplicateCancel}
-        busy={saving}
-      />
-    );
-  }
-
-  if (state === "editing" && editingId != null) {
-    return (
-      <ContactEditor
-        contactId={editingId}
-        onClose={handleEditorClose}
-        onSaved={handleEditorSaved}
-        onDeleted={handleEditorDeleted}
-        senderEmail={
-          googleStatus.authenticated ? googleStatus.user_email : undefined
-        }
-        quotaExhausted={
-          emailQuota != null
-            ? emailQuota.remaining <= 0
-            : false
-        }
-      />
-    );
-  }
-
-  if (state === "success") {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
-          <svg
-            className="h-10 w-10 text-emerald-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
+    if (state === "loading") {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
+          <p className="mt-4 text-lg text-slate-500">Analisando cartão...</p>
         </div>
-        <p className="mt-4 text-xl font-semibold text-slate-800">
-          Contato salvo!
-        </p>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (state === "batch_capture") {
+    if (state === "preview" && contact) {
+      return (
+        <ContactPreview
+          contact={contact}
+          contactId={contactId ?? undefined}
+          capturedDataUrl={capturedDataUrl ?? undefined}
+          senderEmail={
+            googleStatus.authenticated ? googleStatus.user_email : undefined
+          }
+          quotaExhausted={emailQuota != null ? emailQuota.remaining <= 0 : false}
+          onSave={handleSave}
+          onReset={handleReset}
+          saving={saving}
+        />
+      );
+    }
+
+    if (state === "showing_duplicate" && conflict && contact) {
+      return (
+        <DuplicateModal
+          existing={conflict.existing}
+          newContact={contact}
+          onMerge={handleMerge}
+          onForceCreate={handleForceCreate}
+          onCancel={handleDuplicateCancel}
+          busy={saving}
+        />
+      );
+    }
+
+    if (state === "editing" && editingId != null) {
+      return (
+        <ContactEditor
+          contactId={editingId}
+          onClose={handleEditorClose}
+          onSaved={handleEditorSaved}
+          onDeleted={handleEditorDeleted}
+          senderEmail={
+            googleStatus.authenticated ? googleStatus.user_email : undefined
+          }
+          quotaExhausted={
+            emailQuota != null
+              ? emailQuota.remaining <= 0
+              : false
+          }
+        />
+      );
+    }
+
+    if (state === "success") {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
+            <svg
+              className="h-10 w-10 text-emerald-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <p className="mt-4 text-xl font-semibold text-slate-800">
+            Contato salvo!
+          </p>
+        </div>
+      );
+    }
+
+    if (state === "batch_capture") {
+      return (
+        <BatchCapture
+          onClose={() => {
+            void refreshPendingCount();
+            setState("home");
+          }}
+          onProcess={() => setState("processing")}
+          onOpenQueue={() => setState("queue")}
+        />
+      );
+    }
+
+    if (state === "queue") {
+      return (
+        <QueueScreen
+          onClose={() => {
+            void refreshPendingCount();
+            setState("home");
+          }}
+          onProcess={() => setState("processing")}
+          onContinueReview={() => {
+            setReviewIndex(0);
+            setState("review_carousel");
+          }}
+          onCapture={() => setState("batch_capture")}
+        />
+      );
+    }
+
+    if (state === "processing") {
+      return (
+        <ProcessingScreen
+          onClose={() => {
+            void refreshPendingCount();
+            setState("queue");
+          }}
+          onDone={() => {
+            setReviewIndex(0);
+            setState("review_carousel");
+          }}
+        />
+      );
+    }
+
+    if (state === "review_carousel") {
+      return (
+        <ReviewCarousel
+          startIndex={reviewIndex}
+          onClose={() => {
+            void refreshPendingCount();
+            setHistoryKey((k) => k + 1);
+            setState("home");
+          }}
+          onOpenList={() => setState("review_list")}
+        />
+      );
+    }
+
+    if (state === "review_list") {
+      return (
+        <ReviewListView
+          onClose={() => setState("review_carousel")}
+          onPick={(idx) => {
+            setReviewIndex(idx);
+            setState("review_carousel");
+          }}
+        />
+      );
+    }
+
     return (
-      <BatchCapture
-        onClose={() => {
-          void refreshPendingCount();
-          setState("home");
-        }}
-        onProcess={() => setState("processing")}
-        onOpenQueue={() => setState("queue")}
+      <HomeScreen
+        userName={googleStatus.user_name}
+        quota={emailQuota}
+        pendingCount={pendingCount}
+        refreshKey={historyKey}
+        onScanCartao={() => setState("capturing_card")}
+        onScanQR={() => setState("scanning_qr")}
+        // TODO Fase 6: renomear handleScanRajada → handleScanSequencia globalmente
+        onScanSequencia={() => setState(pendingCount > 0 ? "queue" : "batch_capture")}
+        onSelectContact={handleOpenContact}
+        onLogout={handleDisconnect}
+        onAbout={handleOpenAbout}
       />
     );
-  }
-
-  if (state === "queue") {
-    return (
-      <QueueScreen
-        onClose={() => {
-          void refreshPendingCount();
-          setState("home");
-        }}
-        onProcess={() => setState("processing")}
-        onContinueReview={() => {
-          setReviewIndex(0);
-          setState("review_carousel");
-        }}
-        onCapture={() => setState("batch_capture")}
-      />
-    );
-  }
-
-  if (state === "processing") {
-    return (
-      <ProcessingScreen
-        onClose={() => {
-          void refreshPendingCount();
-          setState("queue");
-        }}
-        onDone={() => {
-          setReviewIndex(0);
-          setState("review_carousel");
-        }}
-      />
-    );
-  }
-
-  if (state === "review_carousel") {
-    return (
-      <ReviewCarousel
-        startIndex={reviewIndex}
-        onClose={() => {
-          void refreshPendingCount();
-          setHistoryKey((k) => k + 1);
-          setState("home");
-        }}
-        onOpenList={() => setState("review_list")}
-      />
-    );
-  }
-
-  if (state === "review_list") {
-    return (
-      <ReviewListView
-        onClose={() => setState("review_carousel")}
-        onPick={(idx) => {
-          setReviewIndex(idx);
-          setState("review_carousel");
-        }}
-      />
-    );
-  }
+  };
 
   return (
-    <HomeScreen
-      userName={googleStatus.user_name}
-      quota={emailQuota}
-      pendingCount={pendingCount}
-      refreshKey={historyKey}
-      onScanCartao={() => setState("capturing_card")}
-      onScanQR={() => setState("scanning_qr")}
-      // TODO Fase 6: renomear handleScanRajada → handleScanSequencia globalmente
-      onScanSequencia={() => setState(pendingCount > 0 ? "queue" : "batch_capture")}
-      onSelectContact={handleOpenContact}
-      onLogout={handleDisconnect}
-      onAbout={handleOpenAbout}
-    />
+    <>
+      <OfflineBanner pendingCount={pendingCount} />
+      {renderContent()}
+    </>
   );
 }
