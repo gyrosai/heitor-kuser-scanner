@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import CameraView from "./scan/CameraView";
 import ShutterButton from "./scan/ShutterButton";
 import CaptureHeader from "./scan/CaptureHeader";
+import { CameraDeniedScreen } from "./scan/CameraDeniedScreen";
 
 interface CardCaptureProps {
   onCapture: (imageBase64: string) => void;
@@ -192,6 +193,25 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
       </svg>
     </button>
   ) : undefined;
+
+  if (phase === "error" && errorType === "permission") {
+    return (
+      <>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFallbackFile}
+          className="hidden"
+        />
+        <CameraDeniedScreen
+          mode="card"
+          onClose={onClose}
+          onPickFromGallery={() => fileInputRef.current?.click()}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">

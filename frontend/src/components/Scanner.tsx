@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ContactData } from "@/lib/types";
 import CaptureHeader from "./scan/CaptureHeader";
 import QrFrameGuide from "./scan/QrFrameGuide";
+import { CameraDeniedScreen } from "./scan/CameraDeniedScreen";
 
 function parseVCard(text: string): Partial<ContactData> {
   const get = (key: string) => {
@@ -98,6 +99,7 @@ interface ScannerProps {
 export default function Scanner({ onScan, onClose }: ScannerProps) {
   const scannerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     const elementId = "qr-reader";
@@ -148,7 +150,12 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
         )
         .catch((err: any) => {
           console.error("Erro ao iniciar scanner:", err);
-          setError("Não foi possível acessar a câmera. Verifique as permissões.");
+          const errorName = (err as Error)?.name;
+          if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
+            setPermissionDenied(true);
+          } else {
+            setError("Não foi possível acessar a câmera. Verifique as permissões.");
+          }
         });
     });
 
@@ -166,6 +173,10 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
       }
     };
   }, [onScan]);
+
+  if (permissionDenied) {
+    return <CameraDeniedScreen mode="qr" onClose={onClose} />;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
