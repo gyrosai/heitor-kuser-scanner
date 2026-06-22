@@ -7,10 +7,13 @@ import {
   ConflictError,
   ContactData,
 } from "@/lib/types";
+import type { GoogleAuthStatus } from "@/lib/api";
 import {
+  EmailQuota,
   checkGoogleStatus,
   connectGoogle,
   disconnectGoogle,
+  getEmailQuota,
   mergeContact,
   saveContact,
   scanCard,
@@ -53,8 +56,8 @@ export default function Home() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [conflict, setConflict] = useState<ConflictError | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState<string | undefined>();
+  const [googleStatus, setGoogleStatus] = useState<GoogleAuthStatus>({ authenticated: false });
+  const [emailQuota, setEmailQuota] = useState<EmailQuota | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [reviewIndex, setReviewIndex] = useState(0);
@@ -75,17 +78,22 @@ export default function Home() {
   }, [refreshPendingCount, state]);
 
   useEffect(() => {
+    if (googleStatus.authenticated) {
+      getEmailQuota().then(setEmailQuota).catch(() => {});
+    } else {
+      setEmailQuota(null);
+    }
+  }, [googleStatus.authenticated]);
+
+  useEffect(() => {
     checkGoogleStatus()
-      .then((status) => {
-        setGoogleConnected(status.connected);
-        setGoogleEmail(status.email);
-      })
+      .then((status) => setGoogleStatus(status))
       .catch(() => {});
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_connected") === "true") {
       showToast("Google Contacts conectado com sucesso!", "success");
-      setGoogleConnected(true);
+      checkGoogleStatus().then(setGoogleStatus).catch(() => {});
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("google_error")) {
       showToast("Erro ao conectar com Google. Tente novamente.", "error");
@@ -216,8 +224,7 @@ export default function Home() {
     if (!ok) return;
     try {
       await disconnectGoogle();
-      setGoogleConnected(false);
-      setGoogleEmail(undefined);
+      setGoogleStatus({ authenticated: false });
       showToast("Google desconectado", "success");
     } catch (e) {
       console.error("Erro ao desconectar:", e);
@@ -272,9 +279,11 @@ export default function Home() {
   if (state === "preview" && contact) {
     return (
       <>
-        {googleConnected && googleEmail && (
+        {googleStatus.authenticated && (
           <AccountBanner
-            email={googleEmail}
+            name={googleStatus.user_name}
+            hasGmailSend={googleStatus.has_gmail_send}
+            quota={emailQuota}
             onSwitch={handleDisconnect}
             sticky
           />
@@ -411,12 +420,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-4 py-8 pb-20">
-      {googleConnected && googleEmail && (
-        <AccountBanner email={googleEmail} onSwitch={handleDisconnect} />
+      {googleStatus.authenticated && (
+        <AccountBanner
+          name={googleStatus.user_name}
+          hasGmailSend={googleStatus.has_gmail_send}
+          quota={emailQuota}
+          onSwitch={handleDisconnect}
+        />
       )}
 
       <header className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-800">Heitor Scanner</h1>
+        <h1 className="text-2xl font-bold text-slate-800">CIMI Leads</h1>
         <p className="mt-1 text-sm text-slate-500">
           Escaneie contatos rapidamente
         </p>
@@ -534,7 +548,7 @@ export default function Home() {
         </button>
       </div>
 
-      {!googleConnected && (
+      {!googleStatus.authenticated && (
         <div className="mb-8 rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
           <div className="flex flex-col items-center text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 mb-3">
@@ -595,26 +609,46 @@ export default function Home() {
 }
 
 function AccountBanner({
-  email,
+  name,
+  hasGmailSend,
+  quota,
   onSwitch,
   sticky = false,
 }: {
-  email: string;
+  name: string;
+  hasGmailSend: boolean;
+  quota: EmailQuota | null;
   onSwitch: () => void;
   sticky?: boolean;
 }) {
+  const quotaNearLimit = quota && quota.remaining <= Math.ceil(quota.limit * 0.1);
+
   return (
     <div
       className={`${sticky ? "sticky top-0 z-20" : ""} mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800 flex items-center justify-between gap-3`}
     >
-      <span className="truncate">
-        💡 Salvando como: <span className="font-medium">{email}</span>
+      <span className="truncate min-w-0 flex items-center gap-2 flex-wrap">
+        💡 <span className="font-medium">{name}</span>
+        {!hasGmailSend && (
+          <span className="text-red-600 text-xs">· Reconectar Google (faltam permissões)</span>
+        )}
+        {quota && (
+          <span
+            className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+              quotaNearLimit
+                ? "bg-red-100 text-red-700"
+                : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            📧 {quota.used}/{quota.limit} hoje
+          </span>
+        )}
       </span>
       <button
         onClick={onSwitch}
         className="shrink-0 text-xs font-medium text-amber-900 underline"
       >
-        Trocar conta
+        Sair
       </button>
     </div>
   );

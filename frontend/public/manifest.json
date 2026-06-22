@@ -1,6 +1,6 @@
 {
-  "name": "Heitor Scanner",
-  "short_name": "Scanner",
+  "name": "CIMI Leads",
+  "short_name": "CIMI Leads",
   "description": "Escaneie QR Codes e cartoes de visita",
   "start_url": "/",
   "display": "standalone",

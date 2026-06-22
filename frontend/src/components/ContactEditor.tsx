@@ -32,6 +32,7 @@ const EDITABLE_FIELDS = [
   "event_tag",
   "importance",
   "tags",
+  "idioma_email",
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -109,6 +110,7 @@ export default function ContactEditor({
           event_tag: rec.event_tag,
           importance: rec.importance,
           tags: rec.tags || [],
+          idioma_email: rec.idioma_email ?? "pt-BR",
         });
       })
       .catch((e) => {

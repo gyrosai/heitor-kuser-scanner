@@ -13,7 +13,11 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = ""
     FRONTEND_URL: str = ""
+    SESSION_SECRET_KEY: str = ""
 
+    EMAIL_DAILY_LIMIT: int = 500
+    MEDIA_KIT_DIR: str = "./assets"
+    
     @property
     def origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]

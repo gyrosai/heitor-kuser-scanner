@@ -7,13 +7,14 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import defer
 
 from app.database import async_session, get_db
 from app.db_models import ScannedContact
+from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
 from app.models import (
     ALLOWED_TAGS,
     BatchImageItem,
@@ -49,6 +50,7 @@ def _contact_to_dict(c: ScannedContact, include_image_flag: bool = True) -> dict
         "tags": list(c.tags or []),
         "is_draft": c.is_draft,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
     }
     if include_image_flag:
         # has_image só está disponível se card_image foi carregado;
@@ -73,6 +75,7 @@ def _contact_to_pydantic(c: ScannedContact) -> ContactData:
         event_tag=c.event_tag,
         importance=c.importance,
         tags=list(c.tags or []),
+        idioma_email=getattr(c, "idioma_email", None) or "pt-BR",
     )
 
 
@@ -101,6 +104,7 @@ async def _save_contact(
             tags=list(contact.tags or []),
             card_image=card_image,
             is_draft=True,
+            idioma_email=contact.idioma_email,
         )
         db.add(db_contact)
         await db.commit()
@@ -223,9 +227,11 @@ async def scan_batch(request: BatchScanRequest) -> BatchScanResponse:
 @router.post("/vcard")
 async def create_vcard(
     contact: ContactData,
+    background_tasks: BackgroundTasks,
     contact_id: Optional[int] = Query(None),
     force: bool = Query(False),
     db=Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
     """Gera vCard E salva/atualiza no Google Contacts.
 
@@ -297,6 +303,7 @@ async def create_vcard(
         db_contact.event_tag = contact.event_tag
         db_contact.importance = contact.importance
         db_contact.tags = list(contact.tags or [])
+        db_contact.idioma_email = contact.idioma_email
         db_contact.is_draft = False
         await db.commit()
         await db.refresh(db_contact)
@@ -343,6 +350,7 @@ async def create_vcard(
             promoted.event_tag = contact.event_tag
             promoted.importance = contact.importance
             promoted.tags = list(contact.tags or [])
+            promoted.idioma_email = contact.idioma_email
             promoted.is_draft = False
             await db.commit()
             await db.refresh(promoted)
@@ -365,30 +373,49 @@ async def create_vcard(
                 event_tag=contact.event_tag,
                 importance=contact.importance,
                 tags=list(contact.tags or []),
+                idioma_email=contact.idioma_email,
                 is_draft=False,
             )
             db.add(db_contact)
             await db.commit()
             await db.refresh(db_contact)
 
-    # Salvar/atualizar no Google Contacts (best effort).
+    # ── Passo 2: sync Google Contacts (best effort, independente do passo 1) ──
     try:
         if db_contact is not None and db_contact.google_contact_id:
-            ok = await google_contacts_service.update_google_contact(
-                contact, db_contact.google_contact_id, db
+            new_resource = await google_contacts_service.update_google_contact(
+                contact, db_contact.google_contact_id, db, current_user.email
             )
-            if ok:
+            if new_resource is not None and new_resource != db_contact.google_contact_id:
+                # 404 stale: contato recriado com novo resource name
+                db_contact.google_contact_id = new_resource
+                await db.commit()
+                logger.info(
+                    "google_contact_id atualizado (stale→novo): %s", new_resource
+                )
+            elif new_resource is not None:
                 logger.info("Contato atualizado no Google Contacts: %s", contact.name)
-        else:
+        elif db_contact is not None and db is not None:
             google_resource = await google_contacts_service.save_to_google_contacts(
-                contact, db
+                contact, db, current_user.email
             )
-            if google_resource and db_contact is not None and db is not None:
+            if google_resource:
                 db_contact.google_contact_id = google_resource
                 await db.commit()
                 logger.info("Contato salvo no Google Contacts: %s", contact.name)
     except Exception as e:
-        logger.error("Erro ao salvar/atualizar no Google Contacts: %s", e)
+        logger.error("Erro ao sincronizar Google Contacts: %s", e)
+
+    # ── Passo 3: envio do media kit (sempre, não depende do passo 2) ──────────
+    if db_contact is not None and db_contact.email and db_contact.event_tag:
+        from app.services.email_service import enviar_media_kit
+
+        background_tasks.add_task(
+            enviar_media_kit,
+            contato=db_contact,
+            sender_email=current_user.email,
+            sender_name=current_user.name,
+        )
 
     vcard_str = vcard_service.generate_vcard(contact)
     filename = (contact.name or "contato").replace(" ", "_")
@@ -406,6 +433,7 @@ async def create_vcard(
 async def import_batch(
     contacts: list[ContactData],
     db=Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Importa lista de contatos para o Google Contacts em lote."""
     from app.services import google_contacts_service
@@ -429,7 +457,7 @@ async def import_batch(
             db.add(db_contact)
             await db.commit()
 
-            resource = await google_contacts_service.save_to_google_contacts(contact, db)
+            resource = await google_contacts_service.save_to_google_contacts(contact, db, current_user.email)
             results.append({
                 "index": i + 1,
                 "name": contact.name,
@@ -662,6 +690,7 @@ async def list_contacts(
                 "is_draft": c.is_draft,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
                 "has_image": has_image,
+                "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
             }
         )
     return out
@@ -672,6 +701,7 @@ async def patch_contact(
     contact_id: int,
     payload: dict,
     db=Depends(get_db),
+    current_user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     """Atualiza parcialmente um contato. Sincroniza no Google se aplicável."""
     if db is None:
@@ -699,6 +729,7 @@ async def patch_contact(
         "event_tag",
         "importance",
         "tags",
+        "idioma_email",
     }
     sanitized = {}
     for field, value in payload.items():
@@ -720,7 +751,7 @@ async def patch_contact(
     await db.commit()
     await db.refresh(db_contact)
 
-    if db_contact.google_contact_id:
+    if db_contact.google_contact_id and current_user:
         from app.services import google_contacts_service
 
         try:
@@ -728,6 +759,7 @@ async def patch_contact(
                 _contact_to_pydantic(db_contact),
                 db_contact.google_contact_id,
                 db,
+                current_user.email,
             )
         except Exception as e:
             logger.error("Erro ao sincronizar PATCH com Google: %s", e)
@@ -736,7 +768,11 @@ async def patch_contact(
 
 
 @router.delete("/contacts/{contact_id}", status_code=204)
-async def delete_contact(contact_id: int, db=Depends(get_db)):
+async def delete_contact(
+    contact_id: int,
+    db=Depends(get_db),
+    current_user: CurrentUser | None = Depends(get_current_user_optional),
+):
     """Deleta um contato. Best-effort no Google Contacts."""
     if db is None:
         raise HTTPException(status_code=503, detail="Banco de dados não configurado")
@@ -748,12 +784,12 @@ async def delete_contact(contact_id: int, db=Depends(get_db)):
     if db_contact is None:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
 
-    if db_contact.google_contact_id:
+    if db_contact.google_contact_id and current_user:
         from app.services import google_contacts_service
 
         try:
             await google_contacts_service.delete_google_contact(
-                db_contact.google_contact_id, db
+                db_contact.google_contact_id, db, current_user.email
             )
         except Exception as e:
             logger.error("Erro ao deletar no Google: %s", e)
@@ -801,6 +837,7 @@ async def merge_contact(
     contact_id: int,
     new_contact: ContactData,
     db=Depends(get_db),
+    current_user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     """Merge inteligente do contato existente com novo payload."""
     if db is None:
@@ -821,7 +858,7 @@ async def merge_contact(
     await db.commit()
     await db.refresh(db_contact)
 
-    if db_contact.google_contact_id:
+    if db_contact.google_contact_id and current_user:
         from app.services import google_contacts_service
 
         try:
@@ -829,6 +866,7 @@ async def merge_contact(
                 _contact_to_pydantic(db_contact),
                 db_contact.google_contact_id,
                 db,
+                current_user.email,
             )
         except Exception as e:
             logger.error("Erro ao sincronizar merge com Google: %s", e)
@@ -872,11 +910,16 @@ async def get_contact(contact_id: int, db=Depends(get_db)):
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         "has_image": bool(row[1]),
         "google_contact_id": c.google_contact_id,
+        "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
     }
 
 
 @router.post("/contacts/{contact_id}/sync-google")
-async def sync_contact_google(contact_id: int, db=Depends(get_db)):
+async def sync_contact_google(
+    contact_id: int,
+    db=Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Sincroniza um contato com o Google Contacts (idempotente).
 
     - Se ainda não tem google_contact_id: cria.
@@ -900,7 +943,7 @@ async def sync_contact_google(contact_id: int, db=Depends(get_db)):
 
     if db_contact.google_contact_id:
         ok = await google_contacts_service.update_google_contact(
-            pydantic_contact, db_contact.google_contact_id, db
+            pydantic_contact, db_contact.google_contact_id, db, current_user.email
         )
         if not ok:
             raise HTTPException(
@@ -910,7 +953,7 @@ async def sync_contact_google(contact_id: int, db=Depends(get_db)):
         return {"google_contact_id": db_contact.google_contact_id, "synced": True}
 
     resource_name = await google_contacts_service.save_to_google_contacts(
-        pydantic_contact, db
+        pydantic_contact, db, current_user.email
     )
     if not resource_name:
         raise HTTPException(

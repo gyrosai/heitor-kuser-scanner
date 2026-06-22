@@ -6,6 +6,24 @@ from pydantic import BaseModel, Field, field_validator
 
 ALLOWED_TAGS = ["Patrocínio", "Palestrante", "Parceria", "Cliente", "Mídia", "Follow-up"]
 
+# Classificação CIMI — valores válidos para tags com convenção tipo:subtipo
+_CLASSIFICATION_VALID: dict[str, set[str]] = {
+    "cimi_invest": {"parceria", "venda"},
+    "cimi_360": {"stand", "patrocinio"},
+}
+
+
+def _is_valid_tag(tag: str) -> bool:
+    if not isinstance(tag, str):
+        return False
+    if tag in ALLOWED_TAGS:
+        return True
+    if ":" in tag:
+        tipo, _, subtipo = tag.partition(":")
+        valid_subtipos = _CLASSIFICATION_VALID.get(tipo)
+        return valid_subtipos is not None and subtipo in valid_subtipos
+    return False
+
 
 class ContactData(BaseModel):
     name: str
@@ -20,6 +38,7 @@ class ContactData(BaseModel):
     incomplete: bool = False
     importance: Optional[int] = Field(None, ge=1, le=3)
     tags: list[str] = []
+    idioma_email: Literal["pt-BR", "en", "es"] = "pt-BR"
 
     @field_validator("importance", mode="before")
     @classmethod
@@ -39,7 +58,7 @@ class ContactData(BaseModel):
             return []
         if not isinstance(v, list):
             return []
-        return [t for t in v if isinstance(t, str) and t in ALLOWED_TAGS]
+        return [t for t in v if _is_valid_tag(t)]
 
 
 class ScanRequest(BaseModel):

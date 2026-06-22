@@ -1,15 +1,15 @@
 import os
 import logging
 import httpx
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from google_auth_oauthlib.flow import Flow
 from app.config import settings
 from app.database import get_db
 from app.db_models import GoogleAuth
+from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
 
 # Relaxar validação de scope — Google adiciona "openid" automaticamente
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
@@ -21,6 +21,8 @@ SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/contacts",
     "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 
@@ -51,9 +53,12 @@ async def google_auth():
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
+async def google_callback(
+    request: Request,
+    code: str,
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        # 1. Trocar code por tokens
         flow = create_flow()
         flow.fetch_token(code=code)
         credentials = flow.credentials
@@ -61,18 +66,17 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         if not credentials.refresh_token:
             logger.warning("Não recebeu refresh_token")
 
-        # 2. Buscar email via userinfo (NÃO usar People API aqui)
         userinfo_resp = httpx.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
         )
         userinfo = userinfo_resp.json()
-        email = userinfo.get("email", "unknown")
-        logger.info("Google OAuth sucesso para: %s", email)
+        user_email = userinfo.get("email", "unknown")
+        user_name = userinfo.get("name") or user_email.split("@")[0]
+        logger.info("Google OAuth sucesso para: %s", user_email)
 
-        # 3. Salvar tokens no banco
         result = await db.execute(
-            select(GoogleAuth).where(GoogleAuth.user_email == email)
+            select(GoogleAuth).where(GoogleAuth.user_email == user_email)
         )
         existing = result.scalar_one_or_none()
 
@@ -83,17 +87,19 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
             existing.token_expiry = credentials.expiry
             existing.scopes = " ".join(credentials.scopes or [])
         else:
-            auth = GoogleAuth(
-                user_email=email,
+            db.add(GoogleAuth(
+                user_email=user_email,
                 access_token=credentials.token,
                 refresh_token=credentials.refresh_token or "",
                 token_expiry=credentials.expiry,
                 scopes=" ".join(credentials.scopes or []),
-            )
-            db.add(auth)
+            ))
 
         await db.commit()
-        logger.info("Tokens salvos no banco para: %s", email)
+        logger.info("Tokens salvos no banco para: %s", user_email)
+
+        request.session["user_email"] = user_email
+        request.session["user_name"] = user_name
 
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}?google_connected=true"
@@ -107,26 +113,39 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/google/status")
-async def google_status(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(GoogleAuth).limit(1))
+async def google_status(
+    current_user: CurrentUser | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user:
+        return {"authenticated": False}
+
+    result = await db.execute(
+        select(GoogleAuth).where(GoogleAuth.user_email == current_user.email)
+    )
     auth = result.scalar_one_or_none()
-    if auth:
-        return {"connected": True, "email": auth.user_email}
-    return {"connected": False}
+    scopes = (auth.scopes or "").split() if auth else []
+    has_gmail = "https://www.googleapis.com/auth/gmail.send" in scopes
+
+    return {
+        "authenticated": True,
+        "user_email": current_user.email,
+        "user_name": current_user.name,
+        "scopes": scopes,
+        "has_gmail_send": has_gmail,
+    }
 
 
-@router.post("/google/disconnect", status_code=204)
-async def google_disconnect(db: AsyncSession = Depends(get_db)):
-    """Apaga todos os registros de google_auth. Não toca em scanned_contacts.
-
-    Permite trocar a conta Google ativa (single-account). Contatos já salvos
-    permanecem com seu google_contact_id antigo, mas novos scans não serão
-    sincronizados até alguém reconectar.
-    """
-    result = await db.execute(select(GoogleAuth))
-    rows = result.scalars().all()
-    for row in rows:
-        await db.delete(row)
+@router.post("/google/disconnect")
+async def google_disconnect(
+    request: Request,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        delete(GoogleAuth).where(GoogleAuth.user_email == current_user.email)
+    )
     await db.commit()
-    logger.info("Google desconectado: %d registros removidos", len(rows))
-    return Response(status_code=204)
+    request.session.clear()
+    logger.info("Google desconectado para: %s", current_user.email)
+    return {"status": "disconnected"}

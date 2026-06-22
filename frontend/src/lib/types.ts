@@ -11,6 +11,40 @@ export type AllowedTag = (typeof ALLOWED_TAGS)[number];
 
 export type Importance = 1 | 2 | 3 | null;
 
+export type IdiomaEmail = "pt-BR" | "en" | "es";
+
+export type SubtipoInvest = "parceria" | "venda";
+export type Subtipo360 = "stand" | "patrocinio";
+export type ClassificacaoTag =
+  | `cimi_invest:${SubtipoInvest}`
+  | `cimi_360:${Subtipo360}`;
+
+export type ClassificacaoState = {
+  cimi_invest: SubtipoInvest | null;
+  cimi_360: Subtipo360 | null;
+};
+
+export function classificacoesToTags(c: ClassificacaoState): ClassificacaoTag[] {
+  const tags: ClassificacaoTag[] = [];
+  if (c.cimi_invest) tags.push(`cimi_invest:${c.cimi_invest}`);
+  if (c.cimi_360) tags.push(`cimi_360:${c.cimi_360}`);
+  return tags;
+}
+
+export function tagsToClassificacoes(tags: string[]): ClassificacaoState {
+  const state: ClassificacaoState = { cimi_invest: null, cimi_360: null };
+  for (const tag of tags) {
+    if (tag.startsWith("cimi_invest:")) {
+      const sub = tag.slice("cimi_invest:".length) as SubtipoInvest;
+      if (sub === "parceria" || sub === "venda") state.cimi_invest = sub;
+    } else if (tag.startsWith("cimi_360:")) {
+      const sub = tag.slice("cimi_360:".length) as Subtipo360;
+      if (sub === "stand" || sub === "patrocinio") state.cimi_360 = sub;
+    }
+  }
+  return state;
+}
+
 export interface ContactData {
   name: string;
   phone: string | null;
@@ -23,6 +57,7 @@ export interface ContactData {
   event_tag: string | null;
   importance: Importance;
   tags: string[];
+  idioma_email: IdiomaEmail;
   incomplete?: boolean;
 }
 

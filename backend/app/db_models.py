@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 
@@ -25,11 +25,33 @@ class ScannedContact(Base):
     tags = Column(ARRAY(String), nullable=False, server_default="{}")
     card_image = Column(LargeBinary, nullable=True)
     is_draft = Column(Boolean, nullable=False, server_default="true")
+    idioma_email = Column(String(10), nullable=False, server_default="pt-BR")
+    observacao_audio_url = Column(String(500), nullable=True)
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class EmailLog(Base):
+    __tablename__ = "email_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    contact_id = Column(Integer, ForeignKey("scanned_contacts.id"), nullable=True, index=True)
+    to_email = Column(String(255), nullable=False)
+    sent_by_email = Column(String(255), nullable=False, index=True)
+    sent_by_name = Column(String(255), nullable=True)
+    subject = Column(String(500), nullable=False)
+    idioma = Column(String(10), nullable=False)
+    status = Column(String(50), nullable=False)
+    gmail_message_id = Column(String(100), nullable=True)
+    gmail_thread_id = Column(String(100), nullable=True)
+    error_message = Column(Text, nullable=True)
+    classificacoes_snapshot = Column(ARRAY(String), nullable=True)
+    template_version = Column(String(50), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class GoogleAuth(Base):

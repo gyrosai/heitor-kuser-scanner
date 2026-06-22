@@ -4,12 +4,12 @@ import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Heitor Scanner",
+  title: "CIMI Leads",
   description: "Escaneie QR Codes e cartoes de visita",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Heitor Scanner",
+    title: "CIMI Leads",
   },
   manifest: "/manifest.json",
 };

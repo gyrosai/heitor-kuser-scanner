@@ -2,9 +2,10 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.routers import auth, scan
+from app.routers import auth, email, scan, transcribe
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,17 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="Heitor Scanner API",
+    title="CIMI Leads API",
     version="1.0.0",
     docs_url="/docs",
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET_KEY,
+    same_site="lax",
+    https_only=settings.ENV == "production",
+    max_age=60 * 60 * 24 * 30,
 )
 
 app.add_middleware(
@@ -29,6 +38,8 @@ app.add_middleware(
 
 app.include_router(scan.router)
 app.include_router(auth.router)
+app.include_router(transcribe.router)
+app.include_router(email.router)
 
 
 @app.on_event("startup")
@@ -49,4 +60,4 @@ async def startup():
 
 @app.get("/")
 async def root() -> dict:
-    return {"message": "Heitor Scanner API", "docs": "/docs"}
+    return {"message": "CIMI Leads API", "docs": "/docs"}

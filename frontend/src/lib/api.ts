@@ -38,6 +38,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 export async function scanQRCode(imageBase64: string): Promise<ScanResponse> {
   const res = await fetch(`${API_URL}/api/scan/qrcode`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: imageBase64 }),
   });
@@ -47,6 +48,7 @@ export async function scanQRCode(imageBase64: string): Promise<ScanResponse> {
 export async function scanCard(imageBase64: string): Promise<ScanResponse> {
   const res = await fetch(`${API_URL}/api/scan/card`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: imageBase64 }),
   });
@@ -58,17 +60,27 @@ export async function scanBatch(
 ): Promise<BatchScanResponse> {
   const res = await fetch(`${API_URL}/api/scan/batch`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ images: items }),
   });
   return jsonOrThrow<BatchScanResponse>(res);
 }
 
-export async function checkGoogleStatus(): Promise<{
-  connected: boolean;
-  email?: string;
-}> {
-  const res = await fetch(`${API_URL}/api/auth/google/status`);
+export type GoogleAuthStatus =
+  | { authenticated: false }
+  | {
+      authenticated: true;
+      user_email: string;
+      user_name: string;
+      scopes: string[];
+      has_gmail_send: boolean;
+    };
+
+export async function checkGoogleStatus(): Promise<GoogleAuthStatus> {
+  const res = await fetch(`${API_URL}/api/auth/google/status`, {
+    credentials: "include",
+  });
   return res.json();
 }
 
@@ -79,6 +91,7 @@ export function connectGoogle(): void {
 export async function disconnectGoogle(): Promise<void> {
   const res = await fetch(`${API_URL}/api/auth/google/disconnect`, {
     method: "POST",
+    credentials: "include",
   });
   if (!res.ok && res.status !== 204) {
     throw new Error(`Falha ao desconectar (${res.status})`);
@@ -103,22 +116,28 @@ export async function listContacts(params?: {
   if (params?.include_drafts)
     url.searchParams.set("include_drafts", "true");
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { credentials: "include" });
   return jsonOrThrow<ContactRecord[]>(res);
 }
 
 export async function getContact(id: number): Promise<ContactRecord> {
-  const res = await fetch(`${API_URL}/api/contacts/${id}`);
+  const res = await fetch(`${API_URL}/api/contacts/${id}`, {
+    credentials: "include",
+  });
   return jsonOrThrow<ContactRecord>(res);
 }
 
 export async function listTags(): Promise<TagInfo[]> {
-  const res = await fetch(`${API_URL}/api/contacts/tags`);
+  const res = await fetch(`${API_URL}/api/contacts/tags`, {
+    credentials: "include",
+  });
   return jsonOrThrow<TagInfo[]>(res);
 }
 
 export async function listEvents(): Promise<EventInfo[]> {
-  const res = await fetch(`${API_URL}/api/contacts/events`);
+  const res = await fetch(`${API_URL}/api/contacts/events`, {
+    credentials: "include",
+  });
   return jsonOrThrow<EventInfo[]>(res);
 }
 
@@ -128,6 +147,7 @@ export async function updateContact(
 ): Promise<ContactRecord> {
   const res = await fetch(`${API_URL}/api/contacts/${id}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(partial),
   });
@@ -137,6 +157,7 @@ export async function updateContact(
 export async function deleteContact(id: number): Promise<void> {
   const res = await fetch(`${API_URL}/api/contacts/${id}`, {
     method: "DELETE",
+    credentials: "include",
   });
   if (!res.ok && res.status !== 204) {
     throw new Error(`Falha ao deletar (${res.status})`);
@@ -149,6 +170,7 @@ export async function mergeContact(
 ): Promise<ContactRecord> {
   const res = await fetch(`${API_URL}/api/contacts/${id}/merge`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
@@ -160,6 +182,7 @@ export async function syncContactToGoogle(
 ): Promise<{ google_contact_id: string; synced: boolean }> {
   const res = await fetch(`${API_URL}/api/contacts/${id}/sync-google`, {
     method: "POST",
+    credentials: "include",
   });
   return jsonOrThrow(res);
 }
@@ -199,6 +222,7 @@ export async function saveContact(
 
   const res = await fetch(url.toString(), {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(contact),
   });
@@ -234,9 +258,41 @@ export async function saveContact(
 }
 
 /**
- * @deprecated Use saveContact. Mantido temporariamente caso algum chamador
- * antigo ainda esteja em runtime durante a transição.
+ * @deprecated Use saveContact.
  */
 export async function downloadVCard(contact: ContactData): Promise<void> {
   return saveContact(contact);
+}
+
+export interface EmailQuota {
+  sender_email: string;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export async function getEmailQuota(): Promise<EmailQuota | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/emails/quota`, {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<EmailQuota>;
+  } catch {
+    return null;
+  }
+}
+
+export async function sendTestEmail(
+  to: string,
+  idioma: string = "pt-BR",
+): Promise<{ status: string; gmail_message_id?: string; error?: string }> {
+  const url = new URL(`${API_URL}/api/emails/test`);
+  url.searchParams.set("to", to);
+  url.searchParams.set("idioma", idioma);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    credentials: "include",
+  });
+  return jsonOrThrow(res);
 }
