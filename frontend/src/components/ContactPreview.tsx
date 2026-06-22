@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  ALLOWED_TAGS,
   ClassificacaoState,
   ContactData,
   EmailLanguage,
@@ -9,81 +10,53 @@ import {
   classificacoesToTags,
   tagsToClassificacoes,
 } from "@/lib/types";
-import CardImagePreview from "./CardImagePreview";
-import Field from "./Field";
-import StarRating from "./StarRating";
-import TagChips from "./TagChips";
+import {
+  AppHeader,
+  Banner,
+  BottomBar,
+  Button,
+  Chip,
+  Input,
+  StarRating,
+  Textarea,
+} from "@/components/ui";
 import ClassificacaoSection from "./contact/ClassificacaoSection";
 import ObservacaoAudio from "./contact/ObservacaoAudio";
+import EmailKitSection from "./contact/EmailKitSection";
+import CapturePreview from "./scan/CapturePreview";
 
 const LEGACY_EVENT_KEY = "heitor_scanner_last_event_tag";
 export const LAST_EVENT_KEY = "cimi_leads_last_event_tag";
 
-// Tags que NÃO são classificação CIMI (são do TagChips / interesse)
 function isClassificationTag(tag: string) {
   return tag.startsWith("cimi_invest:") || tag.startsWith("cimi_360:");
+}
+
+function countNonEmptyFields(contact: ContactData): number {
+  return [contact.name, contact.phone, contact.email, contact.company, contact.role, contact.website]
+    .filter(Boolean).length;
 }
 
 interface ContactPreviewProps {
   contact: ContactData;
   contactId?: number;
+  capturedDataUrl?: string;
+  senderEmail?: string;
+  quotaExhausted?: boolean;
   onSave: (contact: ContactData) => void;
   onReset: () => void;
   saving?: boolean;
-  saveLabel?: string;
 }
-
-// ── Seção de Idioma do e-mail ─────────────────────────────────────────────────
-
-function EmailLanguageSection({
-  value,
-  onChange,
-}: {
-  value: EmailLanguage;
-  onChange: (v: EmailLanguage) => void;
-}) {
-  const options: { code: EmailLanguage; label: string }[] = [
-    { code: "pt-BR", label: "PT" },
-    { code: "en", label: "EN" },
-    { code: "es", label: "ES" },
-  ];
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-slate-600">
-        Idioma do e-mail
-      </label>
-      <div className="flex gap-3">
-        {options.map(({ code, label }) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => onChange(code)}
-            className={`px-4 py-2 rounded-lg min-w-[60px] min-h-[44px] font-medium transition-colors ${
-              value === code
-                ? "bg-[#FA6801] text-white"
-                : "bg-gray-100 text-gray-700 active:bg-gray-200"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── ContactPreview principal ──────────────────────────────────────────────────
 
 export default function ContactPreview({
   contact,
-  contactId,
+  capturedDataUrl,
+  senderEmail,
+  quotaExhausted = false,
   onSave,
   onReset,
   saving = false,
-  saveLabel = "Salvar Contato",
 }: ContactPreviewProps) {
-  // Tags de interesse (não-classificação)
   const interestTags = (contact.tags ?? []).filter((t) => !isClassificationTag(t));
 
   const [form, setForm] = useState<ContactData>({
@@ -96,6 +69,11 @@ export default function ContactPreview({
 
   const [classificacao, setClassificacao] = useState<ClassificacaoState>(() =>
     tagsToClassificacoes(contact.tags ?? [])
+  );
+
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailLanguage, setEmailLanguage] = useState<EmailLanguage>(
+    contact.email_language ?? "pt-BR"
   );
 
   useEffect(() => {
@@ -122,7 +100,6 @@ export default function ContactPreview({
   const handleSave = () => {
     if (!form.name?.trim()) return;
 
-    // Valida classificação: se checkbox marcado, subtipo é obrigatório (já garantido pelo toggle)
     const classificationTags = classificacoesToTags(classificacao);
     const allTags = [...(form.tags || []), ...classificationTags];
 
@@ -131,117 +108,131 @@ export default function ContactPreview({
       name: form.name.trim(),
       event_tag: form.event_tag?.trim() || null,
       tags: allTags,
+      send_email: emailEnabled,
+      email_language: emailLanguage,
     };
     onSave(payload);
   };
 
-  // Quando áudio transcreve, preenche notes
   const handleTranscribed = (notes: string) => {
     update("notes", notes);
   };
 
+  const toggleTag = (tag: string) => {
+    const current = form.tags || [];
+    if (current.includes(tag)) {
+      update("tags", current.filter((t) => t !== tag));
+    } else {
+      update("tags", [...current, tag]);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] px-4 py-6 pb-12">
-      <h2 className="mb-4 text-xl font-semibold text-slate-800 text-center">
-        Dados do Contato
-      </h2>
+    <div className="min-h-screen bg-app-bg flex flex-col">
+      <AppHeader title="Revisar contato" onBack={onReset} />
 
-      {contactId != null && (
-        <div className="mb-4">
-          <CardImagePreview contactId={contactId} />
-        </div>
-      )}
+      <div className="flex-1 px-4 py-4 space-y-4 pb-36">
+        <CapturePreview
+          cardImageDataUrl={capturedDataUrl}
+          capturedAt={new Date()}
+          source={contact.source}
+          extractedFields={countNonEmptyFields(contact)}
+        />
 
-      {contact.incomplete && (
-        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 text-center">
-          Alguns dados podem estar incompletos
-        </div>
-      )}
+        {contact.incomplete && (
+          <Banner
+            variant="warning"
+            title="Dados incompletos"
+            description="Alguns campos não foram extraídos automaticamente. Revise antes de salvar."
+          />
+        )}
 
-      <div className="space-y-4">
-        <Field
-          label="Nome *"
-          value={form.name || ""}
-          onChange={(v) => update("name", v)}
+        <Input
+          label="Nome"
           required
+          value={form.name || ""}
+          onChange={(e) => update("name", e.target.value)}
         />
-        <Field
+        <Input
           label="Telefone"
-          value={form.phone || ""}
-          onChange={(v) => update("phone", v)}
           type="tel"
+          value={form.phone || ""}
+          onChange={(e) => update("phone", e.target.value)}
         />
-        <Field
+        <Input
           label="Email"
-          value={form.email || ""}
-          onChange={(v) => update("email", v)}
           type="email"
+          value={form.email || ""}
+          onChange={(e) => update("email", e.target.value)}
         />
-        <Field
+        <Input
           label="Empresa"
           value={form.company || ""}
-          onChange={(v) => update("company", v)}
+          onChange={(e) => update("company", e.target.value)}
         />
-        <Field
+        <Input
           label="Cargo"
           value={form.role || ""}
-          onChange={(v) => update("role", v)}
+          onChange={(e) => update("role", e.target.value)}
         />
-        <Field
+        <Input
           label="Website"
-          value={form.website || ""}
-          onChange={(v) => update("website", v)}
           type="url"
+          value={form.website || ""}
+          onChange={(e) => update("website", e.target.value)}
         />
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">
-            Importância
-          </label>
+          <p className="text-xs font-semibold text-text-muted mb-2">Importância</p>
           <StarRating
-            value={form.importance as Importance}
-            onChange={(v) => update("importance", v)}
-            size="lg"
+            value={(form.importance as number) ?? 0}
+            onChange={(v) => update("importance", v as Importance)}
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-600">
-            Tipo de interesse
-          </label>
-          <TagChips
-            value={form.tags || []}
-            onChange={(tags) => update("tags", tags)}
-          />
+          <p className="text-xs font-semibold text-text-muted mb-2">Tipo de interesse</p>
+          <div className="flex flex-wrap gap-2">
+            {ALLOWED_TAGS.map((tag) => (
+              <Chip
+                key={tag}
+                active={(form.tags || []).includes(tag)}
+                onClick={() => toggleTag(tag)}
+              >
+                {tag}
+              </Chip>
+            ))}
+          </div>
         </div>
 
-        {/* Classificação CIMI */}
         <ClassificacaoSection value={classificacao} onChange={setClassificacao} />
 
-        {/* Idioma do e-mail */}
-        <EmailLanguageSection
-          value={form.email_language}
-          onChange={(v) => update("email_language", v)}
+        <EmailKitSection
+          emailStatus={null}
+          contactEmail={form.email}
+          contactName={form.name}
+          senderEmail={senderEmail}
+          checked={emailEnabled}
+          onCheckedChange={setEmailEnabled}
+          selectedLanguage={emailLanguage}
+          onLanguageChange={setEmailLanguage}
+          quotaExhausted={quotaExhausted}
         />
 
-        {/* Áudio + Observações */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-600">
-            Observações
-          </label>
+          <p className="text-xs font-semibold text-text-muted">Observações</p>
           <ObservacaoAudio onTranscribed={handleTranscribed} />
-          <textarea
+          <Textarea
             value={form.notes || ""}
             onChange={(e) => update("notes", e.target.value)}
             rows={4}
             placeholder="Notas sobre o contato..."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none transition-colors focus:border-[#FA6801] focus:ring-2 focus:ring-[#FA6801]/20 resize-none"
           />
         </div>
 
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className="text-sm font-medium text-slate-600">Evento</label>
+            <p className="text-xs font-semibold text-text-muted">Evento</p>
             {form.event_tag && (
               <button
                 type="button"
@@ -249,41 +240,35 @@ export default function ContactPreview({
                   update("event_tag", "");
                   setTimeout(() => document.getElementById("event-tag-input")?.focus(), 0);
                 }}
-                className="text-xs text-[#FA6801] underline-offset-2 hover:underline"
+                className="text-xs text-laranja-360 underline-offset-2 hover:underline"
               >
                 Trocar evento
               </button>
             )}
           </div>
-          <input
+          <Input
             id="event-tag-input"
-            type="text"
             value={form.event_tag || ""}
             placeholder="Ex: Web Summit 2026"
             onChange={(e) => update("event_tag", e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none transition-colors focus:border-[#FA6801] focus:ring-2 focus:ring-[#FA6801]/20"
           />
         </div>
       </div>
 
-      <div className="mt-8 space-y-3">
-        <button
+      <BottomBar>
+        <Button
+          variant="primary"
+          fullWidth
+          loading={saving}
+          disabled={!form.name?.trim()}
           onClick={handleSave}
-          disabled={!form.name?.trim() || saving}
-          className="w-full rounded-xl bg-[#FA6801] py-[14px] text-lg font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
-          style={{ minHeight: 52 }}
         >
-          {saving ? "Salvando..." : saveLabel}
-        </button>
-        <button
-          onClick={onReset}
-          disabled={saving}
-          className="w-full rounded-xl border border-[#FA6801]/30 bg-white py-[14px] text-lg font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors disabled:opacity-40"
-          style={{ minHeight: 52 }}
-        >
-          Cancelar
-        </button>
-      </div>
+          {emailEnabled ? "Salvar e enviar Mídia Kit" : "Salvar contato"}
+        </Button>
+        <Button variant="ghost" fullWidth size="sm" onClick={onReset}>
+          Descartar e capturar outro
+        </Button>
+      </BottomBar>
     </div>
   );
 }

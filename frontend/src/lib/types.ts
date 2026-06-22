@@ -58,6 +58,7 @@ export interface ContactData {
   importance: Importance;
   tags: string[];
   email_language: EmailLanguage;
+  send_email?: boolean;
   incomplete?: boolean;
 }
 
