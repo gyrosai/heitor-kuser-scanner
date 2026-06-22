@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Montserrat, Fraunces } from "next/font/google";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ToastProvider } from "@/components/Toast";
+import { NetworkProvider } from "@/providers/NetworkProvider";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -50,7 +51,9 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${montserrat.variable} ${fraunces.variable}`}>
       <body className="antialiased font-sans">
         <ErrorBoundary>
-          <ToastProvider>{children}</ToastProvider>
+          <NetworkProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </NetworkProvider>
         </ErrorBoundary>
       </body>
     </html>
