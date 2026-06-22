@@ -33,6 +33,15 @@
   --color-danger-fg: #B91C1C;
   --color-danger-bg: #FDECEC;
   --color-danger-border: #F5C2C2;
+  --color-info-fg: #1E40AF;
+  --color-info-bg: #EFF6FF;
+  --color-info-border: #BFDBFE;
+
+  /* Tint backgrounds — classification chips */
+  --color-tint-laranja-bg: #FFF0E5;
+  --color-tint-laranja-border: #FFD4B5;
+  --color-tint-atlantico-bg: #E8F5F6;
+  --color-tint-atlantico-border: #B7DEE0;
 
   /* Fonts — resolvidos via next/font CSS vars injetadas no <html> */
   --font-sans: var(--font-montserrat);
@@ -95,6 +104,11 @@ button,
 a {
   transition-property: background-color, border-color, opacity, transform;
   transition-duration: 150ms;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* Hide html5-qrcode default UI clutter */
