@@ -15,6 +15,10 @@ export const apiBaseUrl = (): string => API_URL;
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("oauth:expired"));
+      // TODO: refinar pra distinguir 401 OAuth de outros 401 internos se necessário
+    }
     let detail: unknown = null;
     try {
       const body = await res.json();

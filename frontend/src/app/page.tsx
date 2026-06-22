@@ -26,6 +26,7 @@ import ContactEditor from "@/components/ContactEditor";
 import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { LoginScreen } from "@/components/auth/LoginScreen";
+import { OAuthExpiredScreen } from "@/components/auth/OAuthExpiredScreen";
 import { AboutScreen } from "@/components/about/AboutScreen";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
 import DuplicateModal from "@/components/DuplicateModal";
@@ -70,6 +71,7 @@ export default function Home() {
   const [pendingCount, setPendingCount] = useState(0);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
+  const [oauthExpired, setOauthExpired] = useState(false);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -101,6 +103,7 @@ export default function Home() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_connected") === "true") {
+      setOauthExpired(false);
       showToast("Google Contacts conectado com sucesso!", "success");
       checkGoogleStatus().then(setGoogleStatus).catch(() => {});
       window.history.replaceState({}, "", window.location.pathname);
@@ -243,9 +246,20 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    const handler = () => setOauthExpired(true);
+    window.addEventListener("oauth:expired", handler);
+    return () => window.removeEventListener("oauth:expired", handler);
+  }, []);
+
   const handleLogin = () => {
     setAuthLoading(true);
     connectGoogle(); // window.location.href descarrega a página — setAuthLoading(false) nunca executa
+  };
+
+  const handleReconnect = () => {
+    setOauthExpired(false);
+    handleLogin();
   };
 
   const handleOpenAbout = () => setState("about");
@@ -273,6 +287,15 @@ export default function Home() {
   };
 
   const renderContent = () => {
+    if (oauthExpired) {
+      return (
+        <OAuthExpiredScreen
+          onReconnect={handleReconnect}
+          pendingCount={pendingCount}
+        />
+      );
+    }
+
     if (!googleStatus.authenticated) {
       return <LoginScreen onLogin={handleLogin} loading={authLoading} />;
     }
