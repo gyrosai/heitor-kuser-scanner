@@ -1,6 +1,9 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import CameraView from "./scan/CameraView";
+import ShutterButton from "./scan/ShutterButton";
+import CaptureHeader from "./scan/CaptureHeader";
 
 interface CardCaptureProps {
   onCapture: (imageBase64: string) => void;
@@ -43,13 +46,11 @@ async function openRearCamera(deviceId?: string): Promise<MediaStream> {
     });
   }
   try {
-    // First attempt: force rear camera (fails if not available)
     return await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false,
     });
   } catch {
-    // Fallback: prefer rear but accept any
     return navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment" },
       audio: false,
@@ -58,8 +59,8 @@ async function openRearCamera(deviceId?: string): Promise<MediaStream> {
 }
 
 export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -68,10 +69,13 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
   const [base64Data, setBase64Data] = useState<string | null>(null);
   const [rearDevices, setRearDevices] = useState<MediaDeviceInfo[]>([]);
   const [currentDeviceIdx, setCurrentDeviceIdx] = useState(0);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
+  const [capturing, setCapturing] = useState(false);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    setActiveStream(null);
   }, []);
 
   const startCamera = useCallback(
@@ -83,16 +87,11 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
       try {
         const stream = await openRearCamera(deviceId);
         streamRef.current = stream;
+        setActiveStream(stream);
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-
-        // Enumerate after permission grant so labels are visible
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
-          // Heuristic: prefer devices with "back/rear/environment" in label
           const rear = videoInputs.filter((d) =>
             /back|rear|environment|traseira/i.test(d.label)
           );
@@ -116,7 +115,6 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
     [stopStream]
   );
 
-  // Start camera on mount; stop on unmount
   useEffect(() => {
     startCamera();
     return stopStream;
@@ -124,16 +122,17 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
   }, []);
 
   const handleCapture = () => {
-    const video = videoRef.current;
-    if (!video || phase !== "live") return;
+    const video = videoElementRef.current;
+    if (!video || phase !== "live" || capturing) return;
+    setCapturing(true);
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) { setCapturing(false); return; }
     ctx.drawImage(video, 0, 0);
     canvas.toBlob(async (blob) => {
-      if (!blob) return;
+      if (!blob) { setCapturing(false); return; }
       try {
         const previewUrl = URL.createObjectURL(blob);
         setPreview(previewUrl);
@@ -143,6 +142,8 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
         setPhase("preview");
       } catch (err) {
         console.error("Capture error:", err);
+      } finally {
+        setCapturing(false);
       }
     }, "image/jpeg", 0.92);
   };
@@ -180,141 +181,128 @@ export default function CardCapture({ onCapture, onClose }: CardCaptureProps) {
     }
   };
 
+  const switchButton = rearDevices.length > 1 ? (
+    <button
+      onClick={handleSwitchCamera}
+      aria-label="Trocar câmera"
+      className="flex h-11 w-11 items-center justify-center rounded-full text-white active:opacity-70 transition-opacity"
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    </button>
+  ) : undefined;
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC]">
-      <div className="flex items-center justify-between p-4">
-        <h2 className="text-lg font-semibold text-slate-800">Fotografar Cartão</h2>
-        <button
-          onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 text-xl"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+      <CaptureHeader
+        title="Cartão de Visita"
+        onClose={onClose}
+        rightAction={switchButton}
+      />
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
-
-        {/* ── Sending ── */}
-        {phase === "sending" && (
-          <>
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
-            <p className="text-lg text-slate-500">Analisando cartão...</p>
-          </>
-        )}
-
-        {/* ── Preview after capture ── */}
-        {phase === "preview" && preview && (
-          <>
-            <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview} alt="Preview do cartão" className="w-full object-contain" />
-            </div>
-            <div className="flex w-full max-w-sm gap-3">
-              <button
-                onClick={handleRetake}
-                className="flex-1 rounded-xl border border-[#FA6801]/30 bg-white py-4 text-lg font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors"
-              >
-                Tirar Outra
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="flex-1 rounded-xl bg-[#FA6801] py-4 text-lg font-semibold text-white active:bg-[#E55D00] transition-colors"
-              >
-                Enviar
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ── Live viewfinder (+ loading overlay while stream initialises) ── */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Camera feed — always mounted during loading/live so ref attaches */}
         {(phase === "loading" || phase === "live") && (
-          <div className="flex w-full flex-col items-center gap-4">
-            <div
-              className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-black shadow-sm"
-              style={{ aspectRatio: "4/3" }}
-            >
-              {/* Video is always rendered so the ref attaches; hidden while loading */}
-              <video
-                ref={videoRef}
-                playsInline
-                autoPlay
-                muted
-                className="h-full w-full object-cover"
-                style={{ opacity: phase === "live" ? 1 : 0 }}
-              />
-              {phase === "loading" && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent" />
-                </div>
-              )}
-            </div>
+          <CameraView
+            stream={activeStream}
+            onVideoReady={(v) => { videoElementRef.current = v; }}
+          />
+        )}
 
-            {phase === "live" && (
-              <>
-                <div className="flex w-full max-w-sm items-center gap-3">
-                  {rearDevices.length > 1 && (
-                    <button
-                      onClick={handleSwitchCamera}
-                      title="Trocar câmera"
-                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:bg-slate-200 transition-colors"
-                    >
-                      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                  )}
-                  <button
-                    onClick={handleCapture}
-                    className="flex-1 rounded-xl bg-[#FA6801] py-5 text-lg font-semibold text-white active:bg-[#E55D00] transition-colors"
-                  >
-                    Capturar
-                  </button>
-                </div>
-                <p className="text-center text-sm text-slate-400">
-                  Posicione o cartão sobre uma superfície plana e com boa iluminação
-                </p>
-              </>
-            )}
+        {/* Loading spinner overlay */}
+        {phase === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent" />
           </div>
         )}
 
-        {/* ── Error + gallery fallback ── */}
+        {/* Preview after capture */}
+        {phase === "preview" && preview && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={preview} alt="Preview do cartão" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+
+        {/* Sending */}
+        {phase === "sending" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-laranja-360 border-t-transparent" />
+            <p className="text-lg text-white/70">Analisando cartão...</p>
+          </div>
+        )}
+
+        {/* Error */}
         {phase === "error" && (
-          <>
-            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-red-200 bg-red-50">
-              <svg className="h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-danger-border bg-danger-bg">
+              <svg className="h-12 w-12 text-danger-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
               </svg>
             </div>
             <div className="text-center">
-              <p className="mb-1 text-lg font-semibold text-slate-700">
+              <p className="mb-1 text-lg font-semibold text-white">
                 {errorType === "permission" ? "Permissão negada" : "Câmera indisponível"}
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-white/60">
                 {errorType === "permission"
                   ? "Permita o acesso à câmera nas configurações do navegador."
                   : "Não foi possível acessar a câmera traseira."}
               </p>
             </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFallbackFile}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full max-w-xs rounded-xl border border-[#FA6801]/30 bg-white py-5 text-lg font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors"
-            >
-              Selecionar da galeria
-            </button>
-          </>
+          </div>
         )}
       </div>
+
+      {/* Bottom bar */}
+      {(phase === "live" || phase === "loading") && (
+        <div className="flex flex-col items-center gap-3 bg-black pb-10 pt-5">
+          <ShutterButton
+            onClick={handleCapture}
+            loading={capturing}
+            disabled={phase === "loading"}
+          />
+          {phase === "live" && (
+            <p className="text-center text-xs text-white/50">
+              Posicione o cartão sobre uma superfície plana e com boa iluminação
+            </p>
+          )}
+        </div>
+      )}
+
+      {phase === "preview" && (
+        <div className="flex gap-3 bg-black px-6 pb-10 pt-4">
+          <button
+            onClick={handleRetake}
+            className="flex-1 rounded-xl border border-laranja-360/30 bg-white/10 py-4 text-lg font-semibold text-white active:opacity-80 transition-opacity"
+          >
+            Tirar Outra
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-1 rounded-xl bg-laranja-360 py-4 text-lg font-semibold text-white active:opacity-80 transition-opacity"
+          >
+            Enviar
+          </button>
+        </div>
+      )}
+
+      {phase === "error" && (
+        <div className="bg-black px-6 pb-10 pt-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFallbackFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full rounded-xl border border-laranja-360/30 bg-white/10 py-5 text-lg font-semibold text-white active:opacity-80 transition-opacity"
+          >
+            Selecionar da galeria
+          </button>
+        </div>
+      )}
     </div>
   );
 }
