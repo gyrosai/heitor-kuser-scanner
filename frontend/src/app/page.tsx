@@ -278,24 +278,13 @@ export default function Home() {
 
   if (state === "preview" && contact) {
     return (
-      <>
-        {googleStatus.authenticated && (
-          <AccountBanner
-            name={googleStatus.user_name}
-            hasGmailSend={googleStatus.has_gmail_send}
-            quota={emailQuota}
-            onSwitch={handleDisconnect}
-            sticky
-          />
-        )}
-        <ContactPreview
-          contact={contact}
-          contactId={contactId ?? undefined}
-          onSave={handleSave}
-          onReset={handleReset}
-          saving={saving}
-        />
-      </>
+      <ContactPreview
+        contact={contact}
+        contactId={contactId ?? undefined}
+        onSave={handleSave}
+        onReset={handleReset}
+        saving={saving}
+      />
     );
   }
 
@@ -441,51 +430,5 @@ export default function Home() {
       onLogout={handleDisconnect}
       onConnect={connectGoogle}
     />
-  );
-}
-
-function AccountBanner({
-  name,
-  hasGmailSend,
-  quota,
-  onSwitch,
-  sticky = false,
-}: {
-  name: string;
-  hasGmailSend: boolean;
-  quota: EmailQuota | null;
-  onSwitch: () => void;
-  sticky?: boolean;
-}) {
-  const quotaNearLimit = quota && quota.remaining <= Math.ceil(quota.limit * 0.1);
-
-  return (
-    <div
-      className={`${sticky ? "sticky top-0 z-20" : ""} mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800 flex items-center justify-between gap-3`}
-    >
-      <span className="truncate min-w-0 flex items-center gap-2 flex-wrap">
-        💡 <span className="font-medium">{name}</span>
-        {!hasGmailSend && (
-          <span className="text-red-600 text-xs">· Reconectar Google (faltam permissões)</span>
-        )}
-        {quota && (
-          <span
-            className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-              quotaNearLimit
-                ? "bg-red-100 text-red-700"
-                : "bg-amber-100 text-amber-700"
-            }`}
-          >
-            📧 {quota.used}/{quota.limit} hoje
-          </span>
-        )}
-      </span>
-      <button
-        onClick={onSwitch}
-        className="shrink-0 text-xs font-medium text-amber-900 underline"
-      >
-        Sair
-      </button>
-    </div>
   );
 }
