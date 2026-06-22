@@ -47,7 +47,7 @@ function scanToForm(scan: PendingScan, defaultEventTag: string | null): ContactD
     event_tag: ext.event_tag ?? defaultEventTag,
     importance: (ext.importance ?? null) as Importance,
     tags: ext.tags ?? [],
-    idioma_email: ext.idioma_email ?? "pt-BR",
+    email_language: ext.email_language ?? "pt-BR",
   };
 }
 

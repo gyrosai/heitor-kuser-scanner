@@ -83,7 +83,7 @@ export function parseQRText(text: string): ContactData | null {
     event_tag: null,
     importance: null,
     tags: [],
-    idioma_email: "pt-BR",
+    email_language: "pt-BR",
     incomplete: !parsed.name,
   };
 }
@@ -136,7 +136,7 @@ export default function Scanner({ onScan, onClose }: ScannerProps) {
                 event_tag: null,
                 importance: null,
                 tags: [],
-                idioma_email: "pt-BR",
+                email_language: "pt-BR",
                 incomplete: true,
               },
               decodedText
