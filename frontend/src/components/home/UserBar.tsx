@@ -1,10 +1,11 @@
-import { Mail, LogOut } from 'lucide-react';
+import { Mail, LogOut, Info } from 'lucide-react';
 import type { EmailQuota } from '@/lib/api';
 
 interface UserBarProps {
   userName: string;
   quota: EmailQuota | null;
   onLogout: () => void;
+  onAbout?: () => void;
 }
 
 function initials(name: string): string {
@@ -13,7 +14,7 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function UserBar({ userName, quota, onLogout }: UserBarProps) {
+export function UserBar({ userName, quota, onLogout, onAbout }: UserBarProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-white">
       <div className="w-[38px] h-[38px] rounded-full bg-azul-noturno text-white flex items-center justify-center text-[13px] font-bold shrink-0 tracking-[0.5px]">
@@ -29,6 +30,18 @@ export function UserBar({ userName, quota, onLogout }: UserBarProps) {
           </p>
         )}
       </div>
+
+      {/* TODO: considerar migrar pra menu de usuário (sheet com Sobre + Sair) em viewports muito pequenos */}
+      {onAbout && (
+        <button
+          type="button"
+          onClick={onAbout}
+          aria-label="Sobre o app"
+          className="h-9 w-9 flex items-center justify-center rounded-md text-text-muted hover:text-azul-noturno hover:bg-app-bg"
+        >
+          <Info size={18} strokeWidth={2} />
+        </button>
+      )}
 
       <button
         type="button"
