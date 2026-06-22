@@ -1,24 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ContactData, ContactRecord, Importance } from "@/lib/types";
+import {
+  ClassificacaoState,
+  ContactData,
+  ContactRecord,
+  EmailLanguage,
+  classificacoesToTags,
+  tagsToClassificacoes,
+} from "@/lib/types";
+import { ALLOWED_TAGS } from "@/lib/types";
 import {
   deleteContact,
   getContact,
+  sendMediaKit,
   syncContactToGoogle,
   updateContact,
 } from "@/lib/api";
 import { useToast } from "./Toast";
 import CardImagePreview from "./CardImagePreview";
-import Field from "./Field";
-import StarRating from "./StarRating";
-import TagChips from "./TagChips";
+import ClassificacaoSection from "./contact/ClassificacaoSection";
+import EmailKitSection from "./contact/EmailKitSection";
+import {
+  AppHeader,
+  BottomBar,
+  Button,
+  Chip,
+  Divider,
+  Input,
+  Section,
+  StarRating,
+  Textarea,
+} from "@/components/ui";
 
 interface ContactEditorProps {
   contactId: number;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  senderEmail?: string;
+  quotaExhausted?: boolean;
 }
 
 const EDITABLE_FIELDS = [
@@ -32,7 +53,7 @@ const EDITABLE_FIELDS = [
   "event_tag",
   "importance",
   "tags",
-  "idioma_email",
+  "email_language",
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -81,15 +102,23 @@ export default function ContactEditor({
   onClose,
   onSaved,
   onDeleted,
+  senderEmail,
+  quotaExhausted = false,
 }: ContactEditorProps) {
   const { showToast } = useToast();
   const [original, setOriginal] = useState<ContactRecord | null>(null);
   const [form, setForm] = useState<ContactData | null>(null);
+  const [classificacao, setClassificacao] = useState<ClassificacaoState>({
+    cimi_invest: null,
+    cimi_360: null,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<EmailLanguage>("pt-BR");
 
   useEffect(() => {
     let cancel = false;
@@ -98,6 +127,8 @@ export default function ContactEditor({
       .then((rec) => {
         if (cancel) return;
         setOriginal(rec);
+        const classificationState = tagsToClassificacoes(rec.tags ?? []);
+        setClassificacao(classificationState);
         setForm({
           name: rec.name,
           phone: rec.phone,
@@ -109,9 +140,12 @@ export default function ContactEditor({
           source: rec.source,
           event_tag: rec.event_tag,
           importance: rec.importance,
-          tags: rec.tags || [],
-          idioma_email: rec.idioma_email ?? "pt-BR",
+          tags: (rec.tags ?? []).filter(
+            (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
+          ),
+          email_language: rec.email_language ?? "pt-BR",
         });
+        setSelectedLanguage(rec.email_language ?? "pt-BR");
       })
       .catch((e) => {
         console.error("Erro ao carregar contato:", e);
@@ -141,20 +175,44 @@ export default function ContactEditor({
       showToast("Nome é obrigatório", "error");
       return;
     }
+
+    const classificationTags = classificacoesToTags(classificacao);
+    const allInterestTags = form.tags ?? [];
     const cleaned: ContactData = {
       ...form,
       name: form.name.trim(),
       event_tag: form.event_tag?.trim() || null,
+      tags: [...allInterestTags, ...classificationTags],
+      email_language: selectedLanguage,
     };
     const payload = diffPayload(original, cleaned);
-    if (Object.keys(payload).length === 0) {
+    if (Object.keys(payload).length === 0 && !emailEnabled) {
       showToast("Nada para salvar", "info");
       return;
     }
+
     setSaving(true);
     try {
-      await updateContact(contactId, payload);
-      showToast("Contato atualizado", "success");
+      if (Object.keys(payload).length > 0) {
+        await updateContact(contactId, payload);
+      }
+
+      if (emailEnabled && original.email_status !== "sent") {
+        try {
+          await sendMediaKit(contactId, { language: selectedLanguage });
+          showToast("Mídia Kit enviado.", "success");
+        } catch (sendError) {
+          showToast(
+            sendError instanceof Error
+              ? sendError.message
+              : "Falha no envio do Mídia Kit.",
+            "error",
+          );
+          // Contato continua salvo — não aborta
+        }
+      }
+
+      showToast("Contato salvo.", "success");
       onSaved();
     } catch (e) {
       console.error("Erro ao atualizar contato:", e);
@@ -201,137 +259,220 @@ export default function ContactEditor({
     }
   };
 
+  const handleResend = async () => {
+    setSaving(true);
+    try {
+      await sendMediaKit(contactId, { language: selectedLanguage, force: true });
+      showToast("Mídia Kit reenviado.", "success");
+      const refreshed = await getContact(contactId);
+      setOriginal(refreshed);
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "Falha no reenvio.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    setSaving(true);
+    try {
+      await sendMediaKit(contactId, { language: selectedLanguage });
+      showToast("Mídia Kit enviado.", "success");
+      const refreshed = await getContact(contactId);
+      setOriginal(refreshed);
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "Falha no envio.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading || !form || !original) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
+      <div className="flex min-h-screen flex-col items-center justify-center bg-app-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-laranja-360 border-t-transparent" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-12">
-      <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="text-sm font-medium text-[#FA6801]"
-          >
-            ← Voltar
-          </button>
-          <h2 className="text-base font-semibold text-slate-800">
-            Editar contato
-          </h2>
-          <span className="w-12" />
-        </div>
-      </header>
+  const toggleInterestTag = (tag: string) => {
+    const current = form.tags ?? [];
+    update(
+      "tags",
+      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
+    );
+  };
 
-      <div className="px-4 py-6">
+  return (
+    <div className="min-h-screen bg-app-bg flex flex-col">
+      <AppHeader title="Editar contato" onBack={onClose} />
+
+      <div className="flex-1 pb-2">
         {original.has_image && (
-          <div className="mb-4">
+          <div className="px-4 pt-4">
             <CardImagePreview contactId={contactId} />
           </div>
         )}
 
-        <div className="space-y-4">
-          <Field
-            label="Nome *"
-            value={form.name || ""}
-            onChange={(v) => update("name", v)}
-            required
-          />
-          <Field
-            label="Telefone"
-            value={form.phone || ""}
-            onChange={(v) => update("phone", v)}
-            type="tel"
-          />
-          <Field
-            label="Email"
-            value={form.email || ""}
-            onChange={(v) => update("email", v)}
-            type="email"
-          />
-          <Field
-            label="Empresa"
-            value={form.company || ""}
-            onChange={(v) => update("company", v)}
-          />
-          <Field
-            label="Cargo"
-            value={form.role || ""}
-            onChange={(v) => update("role", v)}
-          />
-          <Field
-            label="Website"
-            value={form.website || ""}
-            onChange={(v) => update("website", v)}
-            type="url"
-          />
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">
-              Importância
-            </label>
-            <StarRating
-              value={form.importance as Importance}
-              onChange={(v) => update("importance", v)}
-              size="lg"
+        <Section title="Dados pessoais">
+          <div className="flex flex-col gap-3">
+            <Input
+              label="Nome"
+              required
+              id="editor-name"
+              value={form.name || ""}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="Nome completo"
+            />
+            <Input
+              label="Telefone"
+              id="editor-phone"
+              type="tel"
+              value={form.phone || ""}
+              onChange={(e) => update("phone", e.target.value)}
+              placeholder="+55 11 99999-0000"
+            />
+            <Input
+              label="E-mail"
+              id="editor-email"
+              type="email"
+              value={form.email || ""}
+              onChange={(e) => update("email", e.target.value)}
+              placeholder="nome@empresa.com"
             />
           </div>
+        </Section>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600">
-              Tipo de interesse
-            </label>
-            <TagChips
-              value={form.tags || []}
-              onChange={(tags) => update("tags", tags)}
+        <Divider />
+
+        <Section title="Empresa">
+          <div className="flex flex-col gap-3">
+            <Input
+              label="Empresa"
+              id="editor-company"
+              value={form.company || ""}
+              onChange={(e) => update("company", e.target.value)}
+              placeholder="Nome da empresa"
+            />
+            <Input
+              label="Cargo"
+              id="editor-role"
+              value={form.role || ""}
+              onChange={(e) => update("role", e.target.value)}
+              placeholder="CEO, Marketing..."
+            />
+            <Input
+              label="Website"
+              id="editor-website"
+              type="url"
+              value={form.website || ""}
+              onChange={(e) => update("website", e.target.value)}
+              placeholder="https://empresa.com"
             />
           </div>
+        </Section>
 
-          <Field
-            label="Observações"
+        <Divider />
+
+        <Section title="Avaliação">
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-xs font-semibold text-text-muted mb-2">
+                Importância
+              </p>
+              <StarRating
+                value={form.importance ?? 0}
+                onChange={(v) => update("importance", v as 1 | 2 | 3 | null)}
+              />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-text-muted mb-2">
+                {/* TODO: "Palestrante" é palavra banida pelo brand guide CIMI360 — remover/renomear na revisão de brand */}
+                Tipo de interesse
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {ALLOWED_TAGS.map((tag) => (
+                  <Chip
+                    key={tag}
+                    active={(form.tags ?? []).includes(tag)}
+                    onClick={() => toggleInterestTag(tag)}
+                  >
+                    {tag}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <Divider />
+
+        <ClassificacaoSection value={classificacao} onChange={setClassificacao} />
+
+        <Divider />
+
+        <EmailKitSection
+          emailStatus={original.email_status}
+          emailSentAt={original.email_sent_at}
+          emailLanguage={original.email_language}
+          emailError={original.email_error}
+          contactEmail={form.email}
+          contactName={form.name}
+          senderEmail={senderEmail}
+          checked={emailEnabled}
+          onCheckedChange={setEmailEnabled}
+          selectedLanguage={selectedLanguage}
+          onLanguageChange={(lang) => {
+            setSelectedLanguage(lang);
+            update("email_language", lang);
+          }}
+          onResend={handleResend}
+          onRetry={handleRetry}
+          quotaExhausted={quotaExhausted}
+        />
+
+        <Divider />
+
+        <Section title="Observações">
+          <Textarea
+            id="editor-notes"
             value={form.notes || ""}
-            onChange={(v) => update("notes", v)}
-            multiline
+            onChange={(e) => update("notes", e.target.value)}
             rows={4}
+            placeholder="Notas sobre o contato..."
           />
+        </Section>
 
-          <Field
-            label="Evento"
+        <Divider />
+
+        <Section title="Evento">
+          <Input
+            id="editor-event"
             value={form.event_tag || ""}
-            onChange={(v) => update("event_tag", v)}
+            onChange={(e) => update("event_tag", e.target.value)}
             placeholder="Ex: Web Summit 2026"
           />
-        </div>
+        </Section>
 
-        <div className="mt-8 space-y-3">
-          <button
-            onClick={handleSave}
-            disabled={saving || !form.name?.trim()}
-            className="w-full rounded-xl bg-[#FA6801] py-[14px] text-lg font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
-            style={{ minHeight: 52 }}
-          >
-            {saving ? "Salvando..." : "Salvar alterações"}
-          </button>
+        <Divider />
 
-          {!original.google_contact_id && (
-            <button
+        {!original.google_contact_id && (
+          <div className="px-5 py-3">
+            <Button
+              variant="secondary"
+              fullWidth
+              loading={syncing}
               onClick={handleSync}
-              disabled={syncing}
-              className="w-full rounded-xl border border-slate-300 bg-white py-[14px] text-base font-semibold text-slate-700 disabled:opacity-40 active:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-              style={{ minHeight: 52 }}
-            >
-              {syncing ? (
-                "Sincronizando..."
-              ) : (
-                <>
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    aria-hidden
-                  >
+              leftIcon={
+                !syncing && (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
                     <path
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                       fill="#4285F4"
@@ -349,61 +490,79 @@ export default function ContactEditor({
                       fill="#EA4335"
                     />
                   </svg>
-                  Sincronizar com Google
-                </>
-              )}
-            </button>
-          )}
-
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              disabled={deleting}
-              className="w-full rounded-xl border border-red-200 bg-white py-[14px] text-base font-semibold text-red-600 disabled:opacity-40 active:bg-red-50 transition-colors"
-              style={{ minHeight: 52 }}
+                )
+              }
             >
-              Excluir contato
-            </button>
-          ) : (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
-              <p className="text-sm text-red-700 font-medium">
-                Tem certeza? Essa ação não pode ser desfeita.
-              </p>
-              {original.google_contact_id && (
-                <p className="text-xs text-red-600">
-                  O contato também será removido do Google Contacts.
-                </p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white disabled:opacity-40"
-                >
-                  {deleting ? "Excluindo..." : "Excluir mesmo"}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  disabled={deleting}
-                  className="flex-1 rounded-xl border border-slate-300 bg-white py-3 text-sm font-medium text-slate-600"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+              {syncing ? "Sincronizando..." : "Sincronizar com Google"}
+            </Button>
+          </div>
+        )}
 
-        <div className="mt-8 text-center text-xs text-slate-400 space-y-1">
+        <div className="mt-6 text-center text-xs text-text-subtle space-y-1 px-4 pb-2">
           <p>Escaneado em {formatDate(original.scanned_at)}</p>
           {original.updated_at && original.updated_at !== original.scanned_at && (
             <p>Atualizado em {formatDate(original.updated_at)}</p>
           )}
           {original.google_contact_id && (
-            <p className="text-emerald-600">✓ Sincronizado com Google</p>
+            <p className="text-success-fg font-semibold">✓ Sincronizado com Google</p>
           )}
         </div>
       </div>
+
+      <BottomBar>
+        <Button
+          fullWidth
+          size="lg"
+          loading={saving}
+          disabled={!form.name?.trim()}
+          onClick={handleSave}
+        >
+          Salvar alterações
+        </Button>
+
+        {!confirmDelete ? (
+          <Button
+            fullWidth
+            variant="destructive"
+            size="md"
+            disabled={deleting}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Excluir contato
+          </Button>
+        ) : (
+          <div className="rounded-xl border border-danger-border bg-danger-bg p-3 flex flex-col gap-2">
+            <p className="text-sm text-danger-fg font-semibold text-center">
+              Tem certeza? Ação irreversível.
+            </p>
+            {original.google_contact_id && (
+              <p className="text-xs text-danger-fg text-center">
+                O contato também será removido do Google Contacts.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                fullWidth
+                loading={deleting}
+                onClick={handleDelete}
+              >
+                {deleting ? "Excluindo..." : "Excluir mesmo"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+      </BottomBar>
     </div>
   );
 }
