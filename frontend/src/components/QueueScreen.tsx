@@ -270,7 +270,7 @@ export default function QueueScreen({
           </button>
         ) : (
           <p className="py-3 text-center text-sm text-slate-400">
-            Tire fotos no Modo Rajada
+            Capture mais em sequência
           </p>
         )}
       </div>
