@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, QrCode, Layers, Filter, Download, Search, Wifi } from 'lucide-react';
+import { Camera, QrCode, Layers, Filter, Download, Wifi } from 'lucide-react';
 import { ALLOWED_TAGS, ContactRecord, EventInfo, Importance } from '@/lib/types';
 import { exportCSV, listContacts, listEvents } from '@/lib/api';
 import type { EmailQuota } from '@/lib/api';
@@ -12,6 +12,7 @@ import { UserBar } from './UserBar';
 import { CimiLeadsWordmark } from './CimiLeadsWordmark';
 import { CaptureCard } from './CaptureCard';
 import { Footer } from './Footer';
+import { SearchInput } from './SearchInput';
 import { ContactListCard } from '@/components/contact/ContactListCard';
 
 interface Filters {
@@ -217,19 +218,8 @@ export function HomeScreen({
           </div>
 
           {/* Search input */}
-          <div className="relative mb-[14px]">
-            <Search
-              size={16}
-              strokeWidth={2}
-              className="absolute left-[14px] top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome ou empresa..."
-              className="w-full py-[11px] pl-[38px] pr-[14px] bg-white border border-border-default rounded-lg text-[13px] font-medium text-text-default placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-azul-noturno/20 focus:border-azul-noturno"
-            />
+          <div className="mb-[14px]">
+            <SearchInput value={searchQuery} onChange={setSearchQuery} />
           </div>
 
           {/* Filters panel */}
