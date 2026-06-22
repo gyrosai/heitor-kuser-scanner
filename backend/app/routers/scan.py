@@ -52,7 +52,10 @@ def _contact_to_dict(c: ScannedContact, include_image_flag: bool = True) -> dict
         "tags": list(c.tags or []),
         "is_draft": c.is_draft,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-        "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
+        "email_language": getattr(c, "email_language", "pt-BR") or "pt-BR",
+        "email_status": getattr(c, "email_status", None),
+        "email_sent_at": c.email_sent_at.isoformat() if getattr(c, "email_sent_at", None) else None,
+        "email_error": getattr(c, "email_error", None),
     }
     if include_image_flag:
         # has_image só está disponível se card_image foi carregado;
@@ -77,7 +80,7 @@ def _contact_to_pydantic(c: ScannedContact) -> ContactData:
         event_tag=c.event_tag,
         importance=c.importance,
         tags=list(c.tags or []),
-        idioma_email=getattr(c, "idioma_email", None) or "pt-BR",
+        email_language=getattr(c, "email_language", None) or "pt-BR",
     )
 
 
@@ -106,7 +109,7 @@ async def _save_contact(
             tags=list(contact.tags or []),
             card_image=card_image,
             is_draft=True,
-            idioma_email=contact.idioma_email,
+            email_language=contact.email_language,
         )
         db.add(db_contact)
         await db.commit()
@@ -305,7 +308,7 @@ async def create_vcard(
         db_contact.event_tag = contact.event_tag
         db_contact.importance = contact.importance
         db_contact.tags = list(contact.tags or [])
-        db_contact.idioma_email = contact.idioma_email
+        db_contact.email_language = contact.email_language
         db_contact.is_draft = False
         await db.commit()
         await db.refresh(db_contact)
@@ -352,7 +355,7 @@ async def create_vcard(
             promoted.event_tag = contact.event_tag
             promoted.importance = contact.importance
             promoted.tags = list(contact.tags or [])
-            promoted.idioma_email = contact.idioma_email
+            promoted.email_language = contact.email_language
             promoted.is_draft = False
             await db.commit()
             await db.refresh(promoted)
@@ -375,7 +378,7 @@ async def create_vcard(
                 event_tag=contact.event_tag,
                 importance=contact.importance,
                 tags=list(contact.tags or []),
-                idioma_email=contact.idioma_email,
+                email_language=contact.email_language,
                 is_draft=False,
             )
             db.add(db_contact)
@@ -697,7 +700,7 @@ async def list_contacts(
                 "is_draft": c.is_draft,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
                 "has_image": has_image,
-                "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
+                "email_language": getattr(c, "email_language", "pt-BR") or "pt-BR",
             }
         )
     return out
@@ -736,7 +739,7 @@ async def patch_contact(
         "event_tag",
         "importance",
         "tags",
-        "idioma_email",
+        "email_language",
     }
     sanitized = {}
     for field, value in payload.items():
@@ -933,7 +936,10 @@ async def get_contact(contact_id: int, db=Depends(get_db)):
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         "has_image": bool(row[1]),
         "google_contact_id": c.google_contact_id,
-        "idioma_email": getattr(c, "idioma_email", "pt-BR") or "pt-BR",
+        "email_language": getattr(c, "email_language", "pt-BR") or "pt-BR",
+        "email_status": getattr(c, "email_status", None),
+        "email_sent_at": c.email_sent_at.isoformat() if getattr(c, "email_sent_at", None) else None,
+        "email_error": getattr(c, "email_error", None),
     }
 
 
