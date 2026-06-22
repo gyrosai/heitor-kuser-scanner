@@ -1,10 +1,38 @@
 {
   "name": "CIMI Leads",
   "short_name": "CIMI Leads",
-  "description": "Escaneie QR Codes e cartoes de visita",
+  "description": "Captura de contatos para eventos do ecossistema CIMI360.",
+  "lang": "pt-BR",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#FA6801",
-  "background_color": "#f8fafc"
+  "theme_color": "#002F3F",
+  "background_color": "#002F3F",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/favicon.ico",
+      "sizes": "32x32",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ]
 }

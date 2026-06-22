@@ -24,6 +24,8 @@ from app.models import (
     ContactData,
     ScanRequest,
     ScanResponse,
+    SendEmailRequest,
+    SendEmailResponse,
 )
 from app.services import image_service, ocr_service, qrcode_service, vcard_service
 
@@ -406,16 +408,21 @@ async def create_vcard(
     except Exception as e:
         logger.error("Erro ao sincronizar Google Contacts: %s", e)
 
-    # ── Passo 3: envio do media kit (sempre, não depende do passo 2) ──────────
-    if db_contact is not None and db_contact.email and db_contact.event_tag:
-        from app.services.email_service import enviar_media_kit
+    # ── Passo 3: e-mail opt-in — dispatch se send_email=True, skipped se False ──
+    if db_contact is not None:
+        if contact.send_email:
+            from app.services.email_dispatch import dispatch_media_kit_email_bg
 
-        background_tasks.add_task(
-            enviar_media_kit,
-            contato=db_contact,
-            sender_email=current_user.email,
-            sender_name=current_user.name,
-        )
+            background_tasks.add_task(
+                dispatch_media_kit_email_bg,
+                contact_id=db_contact.id,
+                sender_email=current_user.email,
+                sender_name=current_user.name,
+                language=contact.email_language,
+            )
+        else:
+            db_contact.email_status = "skipped"
+            await db.commit()
 
     vcard_str = vcard_service.generate_vcard(contact)
     filename = (contact.name or "contato").replace(" ", "_")
@@ -836,6 +843,7 @@ def _smart_merge(existing: ScannedContact, new: ContactData) -> dict:
 async def merge_contact(
     contact_id: int,
     new_contact: ContactData,
+    background_tasks: BackgroundTasks,
     db=Depends(get_db),
     current_user: CurrentUser | None = Depends(get_current_user_optional),
 ):
@@ -870,6 +878,21 @@ async def merge_contact(
             )
         except Exception as e:
             logger.error("Erro ao sincronizar merge com Google: %s", e)
+
+    if current_user:
+        if new_contact.send_email:
+            from app.services.email_dispatch import dispatch_media_kit_email_bg
+
+            background_tasks.add_task(
+                dispatch_media_kit_email_bg,
+                contact_id=db_contact.id,
+                sender_email=current_user.email,
+                sender_name=current_user.name,
+                language=new_contact.email_language,
+            )
+        else:
+            db_contact.email_status = "skipped"
+            await db.commit()
 
     return _contact_to_dict(db_contact)
 
@@ -964,6 +987,63 @@ async def sync_contact_google(
     db_contact.google_contact_id = resource_name
     await db.commit()
     return {"google_contact_id": resource_name, "synced": True}
+
+
+@router.post("/contacts/{contact_id}/send-email", response_model=SendEmailResponse)
+async def send_contact_email(
+    contact_id: int,
+    payload: SendEmailRequest,
+    db=Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Envia o Mídia Kit para o contato via Gmail API (reenvio explícito).
+
+    - 409 se já enviado e force=False.
+    - 422 se o contato não tem e-mail.
+    - 429 se quota diária atingida.
+    - 502 em erros da Gmail API.
+    """
+    if db is None:
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado")
+
+    result = await db.execute(
+        select(ScannedContact).where(ScannedContact.id == contact_id)
+    )
+    db_contact = result.scalar_one_or_none()
+    if db_contact is None:
+        raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+    from app.services.email_dispatch import dispatch_media_kit_email
+
+    dispatch_result = await dispatch_media_kit_email(
+        db=db,
+        contact=db_contact,
+        user=current_user,
+        language=payload.language,
+        force=payload.force,
+    )
+
+    _status_to_http = {
+        "already_sent": 409,
+        "contact_has_no_email": 422,
+        "quota_exhausted": 429,
+        "gmail_api_error": 502,
+        "failed": 502,
+    }
+    http_code = _status_to_http.get(dispatch_result.status)
+    if http_code:
+        raise HTTPException(
+            status_code=http_code,
+            detail={"status": dispatch_result.status, "error": dispatch_result.error},
+        )
+
+    return SendEmailResponse(
+        status="sent",
+        sent_at=dispatch_result.sent_at,
+        language=dispatch_result.language,
+        gmail_message_id=dispatch_result.gmail_message_id,
+        quota_remaining=dispatch_result.quota_remaining,
+    )
 
 
 @router.get("/contacts/{contact_id}/image")

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
+
+# ── Tipos compartilhados ──────────────────────────────────────────────────────
+EmailStatus = Literal["sent", "failed", "queued", "skipped"]
+Language = Literal["pt", "en", "es"]
 
 ALLOWED_TAGS = ["Patrocínio", "Palestrante", "Parceria", "Cliente", "Mídia", "Follow-up"]
 
@@ -39,6 +44,8 @@ class ContactData(BaseModel):
     importance: Optional[int] = Field(None, ge=1, le=3)
     tags: list[str] = []
     idioma_email: Literal["pt-BR", "en", "es"] = "pt-BR"
+    send_email: bool = False
+    email_language: Optional[Language] = None
 
     @field_validator("importance", mode="before")
     @classmethod
@@ -98,3 +105,18 @@ class BatchResultItem(BaseModel):
 
 class BatchScanResponse(BaseModel):
     results: list[BatchResultItem]
+
+
+# ── E-mail explícito ──────────────────────────────────────────────────────────
+
+class SendEmailRequest(BaseModel):
+    language: Optional[Language] = None
+    force: bool = False
+
+
+class SendEmailResponse(BaseModel):
+    status: EmailStatus
+    sent_at: Optional[datetime] = None
+    language: Optional[Language] = None
+    gmail_message_id: Optional[str] = None
+    quota_remaining: Optional[int] = None

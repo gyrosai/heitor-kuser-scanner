@@ -33,6 +33,16 @@ class ScannedContact(Base):
         onupdate=func.now(),
     )
 
+    # ── Rastreamento de envio de e-mail ──────────────────────────────────────
+    # Preenchidos pelo serviço de e-mail após cada tentativa de envio.
+    # NULL em email_status = nunca tentou enviar.
+    email_status = Column(String(20), nullable=True)             # sent|failed|queued|skipped
+    email_sent_at = Column(DateTime(timezone=True), nullable=True)
+    email_language = Column(String(2), nullable=True)            # ISO 639-1: pt|en|es
+    email_error = Column(Text, nullable=True)
+    email_gmail_message_id = Column(String(64), nullable=True)
+    email_attempted_at = Column(DateTime(timezone=True), nullable=True)
+
 
 class EmailLog(Base):
     __tablename__ = "email_logs"
