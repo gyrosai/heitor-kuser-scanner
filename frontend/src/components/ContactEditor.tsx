@@ -18,6 +18,7 @@ import {
   updateContact,
 } from "@/lib/api";
 import { useToast } from "./Toast";
+import { useNetworkStatus } from "@/providers/NetworkProvider";
 import CardImagePreview from "./CardImagePreview";
 import GoogleLogo from "./GoogleLogo";
 import ClassificacaoSection from "./contact/ClassificacaoSection";
@@ -107,6 +108,7 @@ export default function ContactEditor({
   quotaExhausted = false,
 }: ContactEditorProps) {
   const { showToast } = useToast();
+  const { online } = useNetworkStatus();
   const [original, setOriginal] = useState<ContactRecord | null>(null);
   const [form, setForm] = useState<ContactData | null>(null);
   const [classificacao, setClassificacao] = useState<ClassificacaoState>({
@@ -199,17 +201,23 @@ export default function ContactEditor({
       }
 
       if (emailEnabled && original.email_status !== "sent") {
-        try {
-          await sendMediaKit(contactId, { language: selectedLanguage });
-          showToast("Mídia Kit enviado.", "success");
-        } catch (sendError) {
-          showToast(
-            sendError instanceof Error
-              ? sendError.message
-              : "Falha no envio do Mídia Kit.",
-            "error",
-          );
-          // Contato continua salvo — não aborta
+        if (!online) {
+          // TODO Fase 5C: ao voltar online, identificar contatos com email_status='skipped' recentes E preferência de
+          //              envio originalmente true, e disparar retry. Requer 'queued' no backend pra ser semanticamente correto.
+          showToast("Contato salvo. Envio offline — tente enviar quando estiver online.", "info");
+        } else {
+          try {
+            await sendMediaKit(contactId, { language: selectedLanguage });
+            showToast("Mídia Kit enviado.", "success");
+          } catch (sendError) {
+            showToast(
+              sendError instanceof Error
+                ? sendError.message
+                : "Falha no envio do Mídia Kit.",
+              "error",
+            );
+            // Contato continua salvo — não aborta
+          }
         }
       }
 
@@ -437,6 +445,7 @@ export default function ContactEditor({
           onResend={handleResend}
           onRetry={handleRetry}
           quotaExhausted={quotaExhausted}
+          networkOnline={online}
         />
 
         <Divider />

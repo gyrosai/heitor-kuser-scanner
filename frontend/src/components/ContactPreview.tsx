@@ -11,6 +11,7 @@ import {
   tagsToClassificacoes,
 } from "@/lib/types";
 import { useToast } from "@/components/Toast";
+import { useNetworkStatus } from "@/providers/NetworkProvider";
 import {
   AppHeader,
   Banner,
@@ -64,6 +65,7 @@ export default function ContactPreview({
   saving = false,
 }: ContactPreviewProps) {
   const { showToast } = useToast();
+  const { online } = useNetworkStatus();
   const [showOcrBanner, setShowOcrBanner] = useState(ocrFailedProp);
   const interestTags = (contact.tags ?? []).filter((t) => !isClassificationTag(t));
 
@@ -111,7 +113,7 @@ export default function ContactPreview({
     const classificationTags = classificacoesToTags(classificacao);
     const allTags = [...(form.tags || []), ...classificationTags];
 
-    const shouldSendEmail = emailEnabled && !quotaExhausted;
+    const shouldSendEmail = emailEnabled && !quotaExhausted && online;
 
     const payload: ContactData = {
       ...form,
@@ -124,6 +126,10 @@ export default function ContactPreview({
 
     if (emailEnabled && quotaExhausted) {
       showToast("Contato salvo. Envio do Mídia Kit indisponível (quota esgotada).", "info");
+    } else if (emailEnabled && !online) {
+      // TODO Fase 5C: ao voltar online, identificar contatos com email_status='skipped' recentes E preferência de
+      //              envio originalmente true, e disparar retry. Requer 'queued' no backend pra ser semanticamente correto.
+      showToast("Contato salvo. Envio offline — tente enviar quando estiver online.", "info");
     }
 
     onSave(payload);
@@ -262,6 +268,7 @@ export default function ContactPreview({
           selectedLanguage={emailLanguage}
           onLanguageChange={setEmailLanguage}
           quotaExhausted={quotaExhausted}
+          networkOnline={online}
         />
 
         <div className="space-y-2">

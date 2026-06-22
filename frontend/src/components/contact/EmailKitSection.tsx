@@ -2,7 +2,7 @@
 
 import { Badge, Banner, Button, Card, Checkbox, Divider, Section } from "@/components/ui";
 import { EmailLanguage } from "@/lib/types";
-import { MailCheck, MailX, Clock } from "lucide-react";
+import { CloudOff, Clock, MailCheck, MailX } from "lucide-react";
 
 interface EmailKitSectionProps {
   emailStatus?: "sent" | "failed" | "skipped" | null;
@@ -19,6 +19,7 @@ interface EmailKitSectionProps {
   onResend?: () => void;
   onRetry?: () => void;
   quotaExhausted?: boolean;
+  networkOnline?: boolean;
 }
 
 function fmtDate(iso?: string | null) {
@@ -57,6 +58,7 @@ export default function EmailKitSection({
   onResend = undefined,
   onRetry = undefined,
   quotaExhausted = false,
+  networkOnline = true,
 }: EmailKitSectionProps) {
   if (!contactEmail) {
     return (
@@ -108,6 +110,26 @@ export default function EmailKitSection({
     );
   }
 
+  if (emailStatus === "skipped") {
+    return (
+      <Section title="Mídia Kit por E-mail">
+        <Banner
+          variant="warning"
+          icon={<CloudOff size={16} className="text-warning-fg" />}
+          title="Envio pendente"
+          description="O contato foi salvo mas o e-mail não foi enviado. Envie quando estiver online."
+          actions={
+            networkOnline && onRetry ? (
+              <Button variant="ghost" size="sm" onClick={onRetry}>
+                Enviar agora
+              </Button>
+            ) : undefined
+          }
+        />
+      </Section>
+    );
+  }
+
   if (quotaExhausted) {
     return (
       <Section title="Mídia Kit por E-mail">
@@ -132,13 +154,29 @@ export default function EmailKitSection({
   }
 
   // Default: pending / null — tem email, sem envio ainda
+  const isOfflineWithEmail = !networkOnline && checked;
+
   return (
     <Section title="Mídia Kit por E-mail">
       <div className="flex flex-col gap-3">
+        {isOfflineWithEmail && (
+          <Banner
+            variant="warning"
+            icon={<CloudOff size={16} className="text-warning-fg" />}
+            title="Envio aguardando conexão"
+            description="Sem conexão no momento. Salvar agora vai marcar o contato como pendente. Você pode tentar enviar quando o Wi-Fi voltar."
+            // TODO Fase 5C: adicionar email_status='queued' no backend + retry automático ao reconectar
+          />
+        )}
+
         <Checkbox
           checked={checked}
           onChange={onCheckedChange}
-          label="Enviar Mídia Kit ao salvar"
+          label={
+            isOfflineWithEmail
+              ? "Enviar Mídia Kit ao salvar (offline — será marcado como pendente)"
+              : "Enviar Mídia Kit ao salvar"
+          }
         />
 
         <Card padding="sm">
