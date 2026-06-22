@@ -1,5 +1,6 @@
 "use client";
 
+// TODO: refatorar visual com Banner da Fase 3
 import { ContactData, ContactRecord, Importance } from "@/lib/types";
 import CardImagePreview from "./CardImagePreview";
 import StarRating from "./StarRating";

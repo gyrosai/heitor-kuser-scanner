@@ -61,6 +61,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -108,6 +109,7 @@ export default function Home() {
   }, []);
 
   const handleCardCapture = async (imageBase64: string) => {
+    setCapturedDataUrl(`data:image/jpeg;base64,${imageBase64}`);
     setState("loading");
     try {
       const result = await scanCard(imageBase64);
@@ -215,6 +217,7 @@ export default function Home() {
     setContact(null);
     setContactId(null);
     setConflict(null);
+    setCapturedDataUrl(null);
   };
 
   const handleDisconnect = async () => {
@@ -281,6 +284,11 @@ export default function Home() {
       <ContactPreview
         contact={contact}
         contactId={contactId ?? undefined}
+        capturedDataUrl={capturedDataUrl ?? undefined}
+        senderEmail={
+          googleStatus.authenticated ? googleStatus.user_email : undefined
+        }
+        quotaExhausted={emailQuota != null ? emailQuota.remaining <= 0 : false}
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
