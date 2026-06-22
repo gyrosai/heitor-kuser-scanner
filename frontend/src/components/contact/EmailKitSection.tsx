@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Banner, Button, Card, Checkbox, Divider, Section } from "@/components/ui";
+import { Banner, Button, Card, Checkbox, Divider, Section } from "@/components/ui";
 import { EmailLanguage } from "@/lib/types";
 import { CloudOff, Clock, MailCheck, MailX } from "lucide-react";
 
@@ -197,20 +197,20 @@ export default function EmailKitSection({
             <Divider />
             <div className="flex items-center gap-3">
               <span className="text-text-muted w-14 shrink-0">Idioma</span>
-              <div className="flex gap-2">
+              <div className="flex rounded-md overflow-hidden border border-border-default">
                 {(["pt-BR", "en", "es"] as EmailLanguage[]).map((lang) => (
-                  <Badge
+                  <button
                     key={lang}
-                    variant={selectedLanguage === lang ? "info" : "neutral"}
+                    type="button"
+                    onClick={() => onLanguageChange(lang)}
+                    className={
+                      selectedLanguage === lang
+                        ? "flex-1 min-h-9 px-3 text-xs font-bold bg-azul-noturno text-white"
+                        : "flex-1 min-h-9 px-3 text-xs font-semibold text-text-muted"
+                    }
                   >
-                    <button
-                      type="button"
-                      onClick={() => onLanguageChange(lang)}
-                      className="font-semibold min-h-9 flex items-center px-1"
-                    >
-                      {LANGUAGE_LABELS[lang]}
-                    </button>
-                  </Badge>
+                    {LANGUAGE_LABELS[lang]}
+                  </button>
                 ))}
               </div>
             </div>
