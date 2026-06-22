@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 
@@ -35,7 +37,7 @@ async def enviar_media_kit(
 
 
 async def _enviar(contato, sender_email: str, sender_name: str, db) -> EmailLog | None:
-    idioma = contato.idioma_email or DEFAULT_LANGUAGE
+    idioma = contato.email_language or DEFAULT_LANGUAGE
     primeiro_nome = (contato.name or "").split()[0] if contato.name else ""
     evento = contato.event_tag or "evento"
 
