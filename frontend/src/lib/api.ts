@@ -283,6 +283,45 @@ export async function getEmailQuota(): Promise<EmailQuota | null> {
   }
 }
 
+export async function sendMediaKit(
+  contactId: number,
+  opts?: { language?: string; force?: boolean },
+): Promise<{ status: string; gmail_message_id?: string }> {
+  const res = await fetch(`${API_URL}/api/contacts/${contactId}/send-email`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      language: opts?.language ?? "pt-BR",
+      force: opts?.force ?? false,
+    }),
+  });
+
+  if (!res.ok) {
+    let detail: unknown = null;
+    try {
+      const body = await res.json();
+      detail = body?.detail ?? body;
+    } catch {
+      try {
+        detail = await res.text();
+      } catch {
+        detail = null;
+      }
+    }
+
+    if (res.status === 409) throw new Error("E-mail já enviado para este contato.");
+    if (res.status === 422) throw new Error("Este contato não tem endereço de e-mail.");
+    if (res.status === 429) throw new Error("Cota de e-mails esgotada. Tente amanhã.");
+    if (res.status === 502) throw new Error("Falha ao enviar pelo Gmail. Tente novamente.");
+
+    const msg = typeof detail === "string" ? detail : `Erro ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return res.json();
+}
+
 export async function sendTestEmail(
   to: string,
   idioma: string = "pt-BR",

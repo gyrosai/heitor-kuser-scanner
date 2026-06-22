@@ -11,7 +11,7 @@ export type AllowedTag = (typeof ALLOWED_TAGS)[number];
 
 export type Importance = 1 | 2 | 3 | null;
 
-export type IdiomaEmail = "pt-BR" | "en" | "es";
+export type EmailLanguage = "pt-BR" | "en" | "es";
 
 export type SubtipoInvest = "parceria" | "venda";
 export type Subtipo360 = "stand" | "patrocinio";
@@ -57,7 +57,7 @@ export interface ContactData {
   event_tag: string | null;
   importance: Importance;
   tags: string[];
-  idioma_email: IdiomaEmail;
+  email_language: EmailLanguage;
   incomplete?: boolean;
 }
 
@@ -68,6 +68,9 @@ export interface ContactRecord extends ContactData {
   has_image: boolean;
   is_draft?: boolean;
   google_contact_id?: string | null;
+  email_status?: "sent" | "failed" | "skipped" | null;
+  email_sent_at?: string | null;
+  email_error?: string | null;
 }
 
 export interface ScanResponse {
