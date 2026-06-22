@@ -25,6 +25,7 @@ import ClassificacaoSection from "./contact/ClassificacaoSection";
 import ObservacaoAudio from "./contact/ObservacaoAudio";
 import EmailKitSection from "./contact/EmailKitSection";
 import CapturePreview from "./scan/CapturePreview";
+import { AlertCircle, Camera } from "lucide-react";
 
 const LEGACY_EVENT_KEY = "heitor_scanner_last_event_tag";
 export const LAST_EVENT_KEY = "cimi_leads_last_event_tag";
@@ -44,6 +45,8 @@ interface ContactPreviewProps {
   capturedDataUrl?: string;
   senderEmail?: string;
   quotaExhausted?: boolean;
+  ocrFailed?: boolean;
+  onRetakePhoto?: () => void;
   onSave: (contact: ContactData) => void;
   onReset: () => void;
   saving?: boolean;
@@ -54,11 +57,14 @@ export default function ContactPreview({
   capturedDataUrl,
   senderEmail,
   quotaExhausted = false,
+  ocrFailed: ocrFailedProp = false,
+  onRetakePhoto,
   onSave,
   onReset,
   saving = false,
 }: ContactPreviewProps) {
   const { showToast } = useToast();
+  const [showOcrBanner, setShowOcrBanner] = useState(ocrFailedProp);
   const interestTags = (contact.tags ?? []).filter((t) => !isClassificationTag(t));
 
   const [form, setForm] = useState<ContactData>({
@@ -141,6 +147,36 @@ export default function ContactPreview({
       <AppHeader title="Revisar contato" onBack={onReset} />
 
       <div className="flex-1 px-4 py-4 space-y-4 pb-36">
+        {showOcrBanner && (
+          <Banner
+            variant="danger"
+            icon={<AlertCircle size={18} className="text-danger-fg" />}
+            title="Não conseguimos ler o cartão"
+            description="A foto pode estar borrada, com pouca luz ou em ângulo difícil. Refaça a captura — geralmente resolve."
+            actions={
+              <div className="flex gap-2 flex-wrap">
+                {onRetakePhoto && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    leftIcon={<Camera size={13} />}
+                    onClick={onRetakePhoto}
+                  >
+                    Tirar outra foto
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowOcrBanner(false)}
+                >
+                  Preencher manual
+                </Button>
+              </div>
+            }
+          />
+        )}
+
         <CapturePreview
           cardImageDataUrl={capturedDataUrl}
           capturedAt={new Date()}

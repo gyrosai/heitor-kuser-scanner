@@ -72,6 +72,7 @@ export default function Home() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
   const [oauthExpired, setOauthExpired] = useState(false);
+  const [ocrFailed, setOcrFailed] = useState(false);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -125,7 +126,10 @@ export default function Home() {
     try {
       const result = await scanCard(imageBase64);
       if (result.success && result.contact) {
-        setContact(result.contact);
+        const c = result.contact;
+        const failed = !c.name && !c.email && !c.phone && !c.company;
+        setOcrFailed(failed);
+        setContact(c);
         setContactId(result.contact_id ?? null);
         setState("preview");
       } else {
@@ -229,6 +233,12 @@ export default function Home() {
     setContactId(null);
     setConflict(null);
     setCapturedDataUrl(null);
+    setOcrFailed(false);
+  };
+
+  const handleRetakePhoto = () => {
+    setOcrFailed(false);
+    setState("capturing_card");
   };
 
   const handleDisconnect = async () => {
@@ -348,6 +358,8 @@ export default function Home() {
             googleStatus.authenticated ? googleStatus.user_email : undefined
           }
           quotaExhausted={emailQuota != null ? emailQuota.remaining <= 0 : false}
+          ocrFailed={ocrFailed}
+          onRetakePhoto={handleRetakePhoto}
           onSave={handleSave}
           onReset={handleReset}
           saving={saving}
