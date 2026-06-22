@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, QrCode, Layers, Filter, Download, Wifi } from 'lucide-react';
+import { Camera, QrCode, Layers, Filter, Download } from 'lucide-react';
 import { ALLOWED_TAGS, ContactRecord, EventInfo, Importance } from '@/lib/types';
 import { exportCSV, listContacts, listEvents } from '@/lib/api';
 import type { EmailQuota } from '@/lib/api';
 import { useToast } from '@/components/Toast';
-import { Banner } from '@/components/ui/Banner';
 import { Section } from '@/components/ui/Section';
 import { UserBar } from './UserBar';
 import { CimiLeadsWordmark } from './CimiLeadsWordmark';
@@ -24,7 +23,6 @@ interface Filters {
 const EMPTY_FILTERS: Filters = { event_tag: '', min_importance: null, tags: [] };
 
 interface HomeScreenProps {
-  authenticated: boolean;
   userName?: string;
   quota: EmailQuota | null;
   pendingCount: number;
@@ -35,11 +33,10 @@ interface HomeScreenProps {
   onScanSequencia: () => void;
   onSelectContact: (id: number) => void;
   onLogout: () => void;
-  onConnect: () => void;
+  onAbout: () => void;
 }
 
 export function HomeScreen({
-  authenticated,
   userName,
   quota,
   pendingCount,
@@ -49,7 +46,7 @@ export function HomeScreen({
   onScanSequencia,
   onSelectContact,
   onLogout,
-  onConnect,
+  onAbout,
 }: HomeScreenProps) {
   const { showToast } = useToast();
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
@@ -118,36 +115,11 @@ export function HomeScreen({
     });
   };
 
-  // ── Unauthenticated view ─────────────────────────────────────────────────
-  if (!authenticated) {
-    return (
-      <div className="min-h-screen bg-app-bg flex flex-col items-center justify-center px-4 gap-6">
-        <CimiLeadsWordmark />
-        <Banner
-          variant="info"
-          icon={<Wifi size={16} className="text-info-fg" />}
-          title="Conecte sua conta Google"
-          description="Salve contatos na sua agenda e envie o mídia kit automaticamente."
-          actions={
-            <button
-              type="button"
-              onClick={onConnect}
-              className="mt-1 inline-flex items-center gap-2 rounded-lg border border-info-border bg-white px-4 py-2 text-sm font-semibold text-info-fg shadow-sm active:bg-info-bg transition-colors"
-            >
-              Conectar com Google
-            </button>
-          }
-        />
-      </div>
-    );
-  }
-
-  // ── Authenticated view ───────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-app-bg flex flex-col">
       {/* Header: UserBar + Wordmark */}
       <header className="bg-white border-b border-border-default shrink-0">
-        <UserBar userName={userName ?? ''} quota={quota} onLogout={onLogout} />
+        <UserBar userName={userName ?? ''} quota={quota} onLogout={onLogout} onAbout={onAbout} />
         <CimiLeadsWordmark />
       </header>
 
@@ -334,7 +306,7 @@ export function HomeScreen({
           )}
         </div>
 
-        <Footer />
+        <Footer onAbout={onAbout} />
       </div>
     </div>
   );

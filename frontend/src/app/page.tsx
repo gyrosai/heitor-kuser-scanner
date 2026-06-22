@@ -25,16 +25,22 @@ import CardCapture from "@/components/CardCapture";
 import ContactEditor from "@/components/ContactEditor";
 import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
 import { HomeScreen } from "@/components/home/HomeScreen";
+import { LoginScreen } from "@/components/auth/LoginScreen";
+import { AboutScreen } from "@/components/about/AboutScreen";
 import DuplicateModal from "@/components/DuplicateModal";
 import ProcessingScreen from "@/components/ProcessingScreen";
 import QueueScreen from "@/components/QueueScreen";
 import ReviewCarousel from "@/components/ReviewCarousel";
 import ReviewListView from "@/components/ReviewListView";
+import pkg from "../../package.json";
+
+const appVersion = pkg.version;
 
 const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
 
 type AppState =
   | "home"
+  | "about"
   | "scanning_qr"
   | "capturing_card"
   | "loading"
@@ -59,6 +65,7 @@ export default function Home() {
   const [googleStatus, setGoogleStatus] = useState<GoogleAuthStatus>({ authenticated: false });
   const [emailQuota, setEmailQuota] = useState<EmailQuota | null>(null);
   const [saving, setSaving] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
@@ -235,6 +242,13 @@ export default function Home() {
     }
   };
 
+  const handleLogin = () => {
+    setAuthLoading(true);
+    connectGoogle(); // window.location.href descarrega a página — setAuthLoading(false) nunca executa
+  };
+
+  const handleOpenAbout = () => setState("about");
+
   const handleOpenContact = (id: number) => {
     setEditingId(id);
     setState("editing");
@@ -256,6 +270,20 @@ export default function Home() {
     setHistoryKey((k) => k + 1);
     setState("home");
   };
+
+  if (!googleStatus.authenticated) {
+    return <LoginScreen onLogin={handleLogin} loading={authLoading} />;
+  }
+
+  if (state === "about") {
+    return (
+      <AboutScreen
+        onBack={() => setState("home")}
+        version={appVersion}
+        userName={googleStatus.user_name}
+      />
+    );
+  }
 
   if (state === "scanning_qr") {
     return (
@@ -426,8 +454,7 @@ export default function Home() {
 
   return (
     <HomeScreen
-      authenticated={googleStatus.authenticated}
-      userName={googleStatus.authenticated ? googleStatus.user_name : undefined}
+      userName={googleStatus.user_name}
       quota={emailQuota}
       pendingCount={pendingCount}
       refreshKey={historyKey}
@@ -437,7 +464,7 @@ export default function Home() {
       onScanSequencia={() => setState(pendingCount > 0 ? "queue" : "batch_capture")}
       onSelectContact={handleOpenContact}
       onLogout={handleDisconnect}
-      onConnect={connectGoogle}
+      onAbout={handleOpenAbout}
     />
   );
 }
