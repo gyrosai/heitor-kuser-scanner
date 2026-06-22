@@ -16,8 +16,8 @@ interface EmailKitSectionProps {
   onCheckedChange: (v: boolean) => void;
   selectedLanguage: EmailLanguage;
   onLanguageChange: (v: EmailLanguage) => void;
-  onResend: () => void;
-  onRetry: () => void;
+  onResend?: () => void;
+  onRetry?: () => void;
   quotaExhausted?: boolean;
 }
 
@@ -54,8 +54,8 @@ export default function EmailKitSection({
   onCheckedChange,
   selectedLanguage,
   onLanguageChange,
-  onResend,
-  onRetry,
+  onResend = undefined,
+  onRetry = undefined,
   quotaExhausted = false,
 }: EmailKitSectionProps) {
   if (!contactEmail) {
@@ -77,9 +77,11 @@ export default function EmailKitSection({
           title="Mídia Kit enviado"
           description={`${fmtDate(emailSentAt)}${emailLanguage ? ` · ${LANGUAGE_LABELS[emailLanguage as EmailLanguage] ?? emailLanguage}` : ""}`}
           actions={
-            <Button variant="ghost" size="sm" onClick={onResend}>
-              Reenviar
-            </Button>
+            onResend ? (
+              <Button variant="ghost" size="sm" onClick={onResend}>
+                Reenviar
+              </Button>
+            ) : undefined
           }
         />
       </Section>
@@ -95,9 +97,11 @@ export default function EmailKitSection({
           title="Falha no envio"
           description={emailError ?? "Erro desconhecido"}
           actions={
-            <Button variant="ghost" size="sm" onClick={onRetry}>
-              Tentar novamente
-            </Button>
+            onRetry ? (
+              <Button variant="ghost" size="sm" onClick={onRetry}>
+                Tentar novamente
+              </Button>
+            ) : undefined
           }
         />
       </Section>
