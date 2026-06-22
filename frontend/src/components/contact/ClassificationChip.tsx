@@ -9,6 +9,13 @@ interface ClassificationChipProps {
   cls: ClassificationChipData;
 }
 
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  patrocinio: 'Patrocínio',
+  parceria: 'Parceria',
+  venda: 'Venda',
+  stand: 'Stand',
+};
+
 export function ClassificationChip({ cls }: ClassificationChipProps) {
   const isInvest = cls.type === 'invest';
 
@@ -29,7 +36,7 @@ export function ClassificationChip({ cls }: ClassificationChipProps) {
       />
       <span className="uppercase">{isInvest ? 'Invest' : '360'}</span>
       <span className="text-text-muted font-semibold">·</span>
-      <span>{cls.sub}</span>
+      <span>{CLASSIFICATION_LABELS[cls.sub] ?? cls.sub}</span>
     </span>
   );
 }
