@@ -139,47 +139,43 @@ export default function EmailKitSection({
           label="Enviar Mídia Kit ao salvar"
         />
 
-        {checked && (
-          <>
-            <Card padding="sm">
-              <div className="flex flex-col gap-1.5 text-sm">
-                <div className="flex gap-2">
-                  <span className="text-text-muted w-8 shrink-0">Para</span>
-                  <span className="text-text-default font-medium truncate">
-                    {contactName ? `${contactName} <${contactEmail}>` : contactEmail}
-                  </span>
-                </div>
-                <Divider />
-                <div className="flex gap-2">
-                  <span className="text-text-muted w-8 shrink-0">De</span>
-                  <span className="text-text-default font-medium truncate">
-                    {senderEmail ?? "—"}
-                  </span>
-                </div>
-                <Divider />
-                <div className="flex items-center gap-2">
-                  <span className="text-text-muted w-8 shrink-0">Idioma</span>
-                  <div className="flex gap-2">
-                    {(["pt-BR", "en", "es"] as EmailLanguage[]).map((lang) => (
-                      <Badge
-                        key={lang}
-                        variant={selectedLanguage === lang ? "info" : "neutral"}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => onLanguageChange(lang)}
-                          className="font-semibold"
-                        >
-                          {LANGUAGE_LABELS[lang]}
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+        <Card padding="sm">
+          <div className="flex flex-col gap-1.5 text-sm">
+            <div className="flex gap-2">
+              <span className="text-text-muted w-14 shrink-0">Para</span>
+              <span className="text-text-default font-medium truncate">
+                {contactName ? `${contactName} <${contactEmail}>` : contactEmail}
+              </span>
+            </div>
+            <Divider />
+            <div className="flex gap-2">
+              <span className="text-text-muted w-14 shrink-0">De</span>
+              <span className="text-text-default font-medium truncate">
+                {senderEmail ?? "—"}
+              </span>
+            </div>
+            <Divider />
+            <div className="flex items-center gap-3">
+              <span className="text-text-muted w-14 shrink-0">Idioma</span>
+              <div className="flex gap-2">
+                {(["pt-BR", "en", "es"] as EmailLanguage[]).map((lang) => (
+                  <Badge
+                    key={lang}
+                    variant={selectedLanguage === lang ? "info" : "neutral"}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onLanguageChange(lang)}
+                      className="font-semibold min-h-9 flex items-center px-1"
+                    >
+                      {LANGUAGE_LABELS[lang]}
+                    </button>
+                  </Badge>
+                ))}
               </div>
-            </Card>
-          </>
-        )}
+            </div>
+          </div>
+        </Card>
       </div>
     </Section>
   );

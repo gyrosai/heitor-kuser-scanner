@@ -71,7 +71,7 @@ export default function ContactPreview({
     tagsToClassificacoes(contact.tags ?? [])
   );
 
-  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const [emailLanguage, setEmailLanguage] = useState<EmailLanguage>(
     contact.email_language ?? "pt-BR"
   );
