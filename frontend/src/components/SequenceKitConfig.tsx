@@ -6,10 +6,12 @@ import { AppHeader, Banner, Card, Checkbox } from "@/components/ui";
 import type { EmailQuota } from "@/lib/api";
 import type { EmailLanguage } from "@/lib/types";
 
+type ConflictStrategy = "replace" | "keep_both" | "ask";
+
 interface SequenceKitConfigProps {
   contactCount: number;
   emailQuota: EmailQuota | null;
-  onStart: (config: { sendKit: boolean; language: EmailLanguage }) => void;
+  onStart: (config: { sendKit: boolean; language: EmailLanguage; conflictStrategy: ConflictStrategy }) => void;
   onSkip: () => void;
   onBack: () => void;
 }
@@ -32,6 +34,7 @@ export default function SequenceKitConfig({
 
   const [sendKit, setSendKit] = useState(!quotaExhausted);
   const [language, setLanguage] = useState<EmailLanguage>("pt-BR");
+  const [conflictStrategy, setConflictStrategy] = useState<ConflictStrategy>("replace");
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
@@ -94,13 +97,41 @@ export default function SequenceKitConfig({
             </div>
           </Card>
         )}
+
+        {/* Card 3 — estratégia de conflito */}
+        <Card padding="md">
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-semibold text-text-default">
+              Se algum contato já existir no sistema
+            </p>
+            <div className="flex rounded-md overflow-hidden border border-border-default">
+              {(["replace", "keep_both", "ask"] as ConflictStrategy[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setConflictStrategy(s)}
+                  className={
+                    conflictStrategy === s
+                      ? "flex-1 min-h-9 px-3 text-xs font-bold bg-azul-noturno text-white"
+                      : "flex-1 min-h-9 px-3 text-xs font-semibold text-text-muted"
+                  }
+                >
+                  {s === "replace" ? "Substituir" : s === "keep_both" ? "Manter ambos" : "Perguntar"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted">
+              Aplicado a todos os duplicados deste lote
+            </p>
+          </div>
+        </Card>
       </div>
 
       {/* Bottom bar */}
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white px-4 py-3 flex flex-col gap-2">
         <button
           type="button"
-          onClick={() => onStart({ sendKit: quotaExhausted ? false : sendKit, language })}
+          onClick={() => onStart({ sendKit: quotaExhausted ? false : sendKit, language, conflictStrategy })}
           className="w-full rounded-xl bg-[#FA6801] py-3.5 text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
         >
           Começar revisão

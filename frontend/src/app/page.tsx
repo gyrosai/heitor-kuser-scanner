@@ -59,7 +59,7 @@ type AppState =
   | "review_carousel"
   | "review_list";
 
-type SequenceEmailConfig = { sendKit: boolean; language: EmailLanguage };
+type SequenceEmailConfig = { sendKit: boolean; language: EmailLanguage; conflictStrategy: "replace" | "keep_both" | "ask" };
 
 export default function Home() {
   const { showToast } = useToast();
@@ -491,7 +491,7 @@ export default function Home() {
             setState("review_carousel");
           }}
           onSkip={() => {
-            setSequenceEmailConfig({ sendKit: false, language: "pt-BR" });
+            setSequenceEmailConfig({ sendKit: false, language: "pt-BR", conflictStrategy: "replace" });
             setState("review_carousel");
           }}
           onBack={() => setState("queue")}
