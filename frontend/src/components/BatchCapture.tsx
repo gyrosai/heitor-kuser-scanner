@@ -11,9 +11,9 @@ import {
 } from "@/lib/pendingScans";
 import { useToast } from "./Toast";
 import CaptureHeader from "./scan/CaptureHeader";
-import BurstThumbStrip from "./scan/BurstThumbStrip";
+import SequenceThumbStrip from "./scan/BurstThumbStrip";
 
-interface BatchCaptureProps {
+interface SequenceCaptureProps {
   onClose: () => void;
   onProcess: () => void;
   onOpenQueue: () => void;
@@ -26,11 +26,11 @@ interface Shot {
 
 const MAX_RECENT_SHOTS = 5;
 
-export default function BatchCapture({
+export default function SequenceCapture({
   onClose,
   onProcess,
   onOpenQueue,
-}: BatchCaptureProps) {
+}: SequenceCaptureProps) {
   const { showToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [capturedCount, setCapturedCount] = useState(0);
@@ -49,7 +49,7 @@ export default function BatchCapture({
         const counts = await countByStatus();
         setCapturedCount(counts.captured);
       } catch (e) {
-        console.error("Erro ao iniciar BatchCapture:", e);
+        console.error("Erro ao iniciar SequenceCapture:", e);
       }
     })();
   }, [showToast]);
@@ -135,7 +135,7 @@ export default function BatchCapture({
         )}
       </div>
 
-      <BurstThumbStrip
+      <SequenceThumbStrip
         shots={recentShots}
         onProcess={onProcess}
         onRemove={handleRemove}

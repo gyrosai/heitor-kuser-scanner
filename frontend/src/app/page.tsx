@@ -20,7 +20,7 @@ import {
 } from "@/lib/api";
 import { countByStatus } from "@/lib/pendingScans";
 import { useToast } from "@/components/Toast";
-import BatchCapture from "@/components/BatchCapture";
+import SequenceCapture from "@/components/BatchCapture";
 import CardCapture from "@/components/CardCapture";
 import ContactEditor from "@/components/ContactEditor";
 import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
@@ -50,7 +50,7 @@ type AppState =
   | "showing_duplicate"
   | "editing"
   | "success"
-  | "batch_capture"
+  | "sequence_capture"
   | "queue"
   | "processing"
   | "review_carousel"
@@ -424,9 +424,9 @@ export default function Home() {
       );
     }
 
-    if (state === "batch_capture") {
+    if (state === "sequence_capture") {
       return (
-        <BatchCapture
+        <SequenceCapture
           onClose={() => {
             void refreshPendingCount();
             setState("home");
@@ -449,7 +449,7 @@ export default function Home() {
             setReviewIndex(0);
             setState("review_carousel");
           }}
-          onCapture={() => setState("batch_capture")}
+          onCapture={() => setState("sequence_capture")}
         />
       );
     }
@@ -503,8 +503,7 @@ export default function Home() {
         refreshKey={historyKey}
         onScanCartao={() => setState("capturing_card")}
         onScanQR={() => setState("scanning_qr")}
-        // TODO Fase 6: renomear handleScanRajada → handleScanSequencia globalmente
-        onScanSequencia={() => setState(pendingCount > 0 ? "queue" : "batch_capture")}
+        onScanSequence={() => setState(pendingCount > 0 ? "queue" : "sequence_capture")}
         onSelectContact={handleOpenContact}
         onLogout={handleDisconnect}
         onAbout={handleOpenAbout}

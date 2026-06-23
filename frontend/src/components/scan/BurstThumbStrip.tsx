@@ -5,13 +5,13 @@ interface Shot {
   dataUrl: string;
 }
 
-interface BurstThumbStripProps {
+interface SequenceThumbStripProps {
   shots: Shot[];
   onProcess: () => void;
   onRemove?: (id: string) => void;
 }
 
-export default function BurstThumbStrip({ shots, onProcess, onRemove }: BurstThumbStripProps) {
+export default function SequenceThumbStrip({ shots, onProcess, onRemove }: SequenceThumbStripProps) {
   if (shots.length === 0) return null;
 
   return (

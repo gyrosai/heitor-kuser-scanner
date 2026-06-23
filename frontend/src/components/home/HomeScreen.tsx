@@ -29,8 +29,7 @@ interface HomeScreenProps {
   refreshKey: number;
   onScanCartao: () => void;
   onScanQR: () => void;
-  // TODO Fase 6: renomear handleScanRajada → handleScanSequencia globalmente
-  onScanSequencia: () => void;
+  onScanSequence: () => void;
   onSelectContact: (id: number) => void;
   onLogout: () => void;
   onAbout: () => void;
@@ -43,7 +42,7 @@ export function HomeScreen({
   refreshKey,
   onScanCartao,
   onScanQR,
-  onScanSequencia,
+  onScanSequence,
   onSelectContact,
   onLogout,
   onAbout,
@@ -152,7 +151,7 @@ export function HomeScreen({
                   : 'Várias fotos, processadas depois'
               }
               badge={pendingCount > 0 ? pendingCount : undefined}
-              onClick={onScanSequencia}
+              onClick={onScanSequence}
             />
           </div>
         </Section>
