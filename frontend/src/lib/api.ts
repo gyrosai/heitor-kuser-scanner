@@ -59,6 +59,9 @@ export async function scanCard(imageBase64: string): Promise<ScanResponse> {
   return jsonOrThrow<ScanResponse>(res);
 }
 
+// Os tipos Batch* e a função scanBatch espelham a rota POST /api/scan/batch do backend.
+// NÃO confundir com o "modo Em sequência" do usuário — esse é só o conceito de UI/UX
+// que dispara múltiplas chamadas /api/scan/card individuais (não /batch).
 export async function scanBatch(
   items: BatchImageItem[],
 ): Promise<BatchScanResponse> {
