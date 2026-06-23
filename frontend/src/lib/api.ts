@@ -85,10 +85,15 @@ export type GoogleAuthStatus =
     };
 
 export async function checkGoogleStatus(): Promise<GoogleAuthStatus> {
-  const res = await fetch(`${API_URL}/api/auth/google/status`, {
-    credentials: "include",
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/auth/google/status`, {
+      credentials: "include",
+    });
+    if (!res.ok) return { authenticated: false };
+    return res.json();
+  } catch {
+    return { authenticated: false };
+  }
 }
 
 export function connectGoogle(): void {
