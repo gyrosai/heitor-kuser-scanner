@@ -120,10 +120,6 @@ async def google_status(
     current_user: CurrentUser | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    logger.warning("=== /status DEBUG ===")
-    logger.warning("Cookies recebidos: %s", dict(request.cookies))
-    logger.warning("Session user_email: %s", request.session.get("user_email"))
-    logger.warning("=====================")
     if not current_user:
         return {"authenticated": False}
 
