@@ -194,6 +194,18 @@ export default function ReviewCarousel({
       }),
     };
 
+    const hasValidEmail = !!(
+      payload.email &&
+      payload.email.trim().length > 3 &&
+      payload.email.includes("@")
+    );
+    if (sequenceEmailConfig?.sendKit && !hasValidEmail) {
+      showToast(
+        `${payload.name || "Contato"} salvo (sem e-mail — Mídia Kit não enviado)`,
+        "info",
+      );
+    }
+
     try {
       await saveContact(payload, current.scan.contact_id ?? undefined, false);
       if (payload.event_tag) {
