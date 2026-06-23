@@ -20,6 +20,14 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 is_prod = settings.ENV == "production"
 app.add_middleware(
     SessionMiddleware,
@@ -27,14 +35,6 @@ app.add_middleware(
     same_site="none" if is_prod else "lax",
     https_only=is_prod,
     max_age=60 * 60 * 24 * 30,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 app.include_router(scan.router)
