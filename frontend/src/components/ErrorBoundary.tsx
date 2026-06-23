@@ -15,6 +15,11 @@ class ErrorBoundary extends Component<
     return { hasError: true };
   }
 
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[ErrorBoundary]", error);
+    console.error("[ErrorBoundary] componentStack:", info.componentStack);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
