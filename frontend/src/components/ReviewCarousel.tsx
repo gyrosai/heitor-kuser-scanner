@@ -21,10 +21,17 @@ import DuplicateModal from "./DuplicateModal";
 import Field from "./Field";
 import StarRating from "./StarRating";
 import TagChips from "./TagChips";
+import ClassificacaoSection from "./contact/ClassificacaoSection";
+import {
+  type ClassificacaoState,
+  classificacoesToTags,
+  tagsToClassificacoes,
+} from "@/lib/types";
 
 interface SequenceEmailConfig {
   sendKit: boolean;
   language: "pt-BR" | "en" | "es";
+  conflictStrategy?: "replace" | "keep_both" | "ask";
 }
 
 interface ReviewCarouselProps {
@@ -37,6 +44,7 @@ interface ReviewCarouselProps {
 interface ReviewItem {
   scan: PendingScan;
   form: ContactData;
+  classificacao: ClassificacaoState;
 }
 
 function scanToForm(scan: PendingScan, defaultEventTag: string | null): ContactData {
@@ -89,10 +97,14 @@ export default function ReviewCarousel({
         includeImage: false,
       });
       if (cancelled) return;
-      const initial = scans.map((s) => ({
-        scan: s,
-        form: scanToForm(s, null),
-      }));
+      const initial = scans.map((s) => {
+        const form = scanToForm(s, null);
+        return {
+          scan: s,
+          form,
+          classificacao: tagsToClassificacoes(form.tags),
+        };
+      });
       setItems(initial);
       setLoading(false);
       if (initial.length === 0) return;
@@ -127,6 +139,17 @@ export default function ReviewCarousel({
       setItems((prev) =>
         prev.map((it, idx) =>
           idx === currentIndex ? { ...it, form: { ...it.form, [field]: value } } : it,
+        ),
+      );
+    },
+    [currentIndex],
+  );
+
+  const updateClassificacao = useCallback(
+    (next: ClassificacaoState) => {
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === currentIndex ? { ...it, classificacao: next } : it,
         ),
       );
     },
@@ -184,10 +207,15 @@ export default function ReviewCarousel({
     }
 
     setSaving(true);
+    const classificationTags = classificacoesToTags(current.classificacao);
+    const interestTags = (current.form.tags ?? []).filter(
+      (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
+    );
     const payload: ContactData = {
       ...current.form,
       name: current.form.name.trim(),
       event_tag: current.form.event_tag?.trim() || null,
+      tags: [...interestTags, ...classificationTags],
       ...(sequenceEmailConfig != null && {
         send_email: sequenceEmailConfig.sendKit,
         email_language: sequenceEmailConfig.language,
@@ -442,10 +470,17 @@ export default function ReviewCarousel({
             Tipo de interesse
           </label>
           <TagChips
-            value={current.form.tags || []}
+            value={(current.form.tags ?? []).filter(
+              (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
+            )}
             onChange={(tags) => updateForm("tags", tags)}
           />
         </div>
+
+        <ClassificacaoSection
+          value={current.classificacao}
+          onChange={updateClassificacao}
+        />
 
         <Field
           label="Observações"
