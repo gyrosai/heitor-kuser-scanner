@@ -103,12 +103,6 @@ async def google_callback(
         request.session["user_email"] = user_email
         request.session["user_name"] = user_name
 
-        logger.warning("=== /callback DEBUG (post-session-write) ===")
-        logger.warning("Session keys após write: %s", list(request.session.keys()))
-        logger.warning("user_email salvo na session: %s", request.session.get("user_email"))
-        logger.warning("Cookies que vão sair: (Set-Cookie será adicionado pelo SessionMiddleware)")
-        logger.warning("===========================================")
-
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}?google_connected=true"
         )
@@ -122,19 +116,9 @@ async def google_callback(
 
 @router.get("/google/status")
 async def google_status(
-    request: Request,
     current_user: CurrentUser | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    logger.warning("=== /status DEBUG ===")
-    logger.warning("URL: %s", request.url)
-    logger.warning("Origin: %s", request.headers.get("origin", "NONE"))
-    logger.warning("Referer: %s", request.headers.get("referer", "NONE"))
-    logger.warning("User-Agent: %s", request.headers.get("user-agent", "")[:100])
-    logger.warning("Cookies recebidos: %s", dict(request.cookies))
-    logger.warning("Session keys: %s", list(request.session.keys()))
-    logger.warning("Session user_email: %s", request.session.get("user_email"))
-    logger.warning("=====================")
     if not current_user:
         return {"authenticated": False}
 

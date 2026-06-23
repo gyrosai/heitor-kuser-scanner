@@ -9,9 +9,15 @@ import {
   TagInfo,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = ""; // chamadas relativas → Next.js rewrites encaminham pro backend
 
 export const apiBaseUrl = (): string => API_URL;
+
+// new URL() precisa de URL absoluta; quando API_URL é vazio usamos a origem do browser
+function mkUrl(path: string): URL {
+  const base = API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+  return new URL(`${base}${path}`);
+}
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -117,7 +123,7 @@ export async function listContacts(params?: {
   search?: string;
   include_drafts?: boolean;
 }): Promise<ContactRecord[]> {
-  const url = new URL(`${API_URL}/api/contacts`);
+  const url = mkUrl("/api/contacts");
   if (params?.event_tag) url.searchParams.set("event_tag", params.event_tag);
   if (params?.min_importance != null)
     url.searchParams.set("min_importance", String(params.min_importance));
@@ -208,7 +214,7 @@ export function exportCSV(filters?: {
   min_importance?: number;
   tags?: string[];
 }): void {
-  const url = new URL(`${API_URL}/api/contacts/export.csv`);
+  const url = mkUrl("/api/contacts/export.csv");
   if (filters?.event_tag) url.searchParams.set("event_tag", filters.event_tag);
   if (filters?.min_importance != null)
     url.searchParams.set("min_importance", String(filters.min_importance));
@@ -228,7 +234,7 @@ export async function saveContact(
   contactId?: number,
   force = false,
 ): Promise<void> {
-  const url = new URL(`${API_URL}/api/vcard`);
+  const url = mkUrl("/api/vcard");
   if (contactId != null) url.searchParams.set("contact_id", String(contactId));
   if (force) url.searchParams.set("force", "true");
 
@@ -343,7 +349,7 @@ export async function sendTestEmail(
   to: string,
   idioma: string = "pt-BR",
 ): Promise<{ status: string; gmail_message_id?: string; error?: string }> {
-  const url = new URL(`${API_URL}/api/emails/test`);
+  const url = mkUrl("/api/emails/test");
   url.searchParams.set("to", to);
   url.searchParams.set("idioma", idioma);
   const res = await fetch(url.toString(), {
