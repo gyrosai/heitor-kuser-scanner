@@ -239,10 +239,7 @@ export default function ReviewCarousel({
       if (currentIndex >= items.length - 1) finalize();
     } catch (err) {
       console.error("Erro no merge:", err);
-      showToast(
-        err instanceof Error ? err.message : "Erro ao mesclar",
-        "error",
-      );
+      showToast("Falha ao mesclar contato. Tente novamente.", "error");
     } finally {
       setSaving(false);
     }

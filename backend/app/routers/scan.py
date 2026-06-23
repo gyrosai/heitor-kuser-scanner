@@ -856,50 +856,60 @@ async def merge_contact(
     if db is None:
         raise HTTPException(status_code=503, detail="Banco de dados não configurado")
 
-    result = await db.execute(
-        select(ScannedContact).where(ScannedContact.id == contact_id)
-    )
-    db_contact = result.scalar_one_or_none()
-    if db_contact is None:
-        raise HTTPException(status_code=404, detail="Contato não encontrado")
+    try:
+        result = await db.execute(
+            select(ScannedContact).where(ScannedContact.id == contact_id)
+        )
+        db_contact = result.scalar_one_or_none()
+        if db_contact is None:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
 
-    merged = _smart_merge(db_contact, new_contact)
-    for field, value in merged.items():
-        setattr(db_contact, field, value)
-    db_contact.is_draft = False
+        merged = _smart_merge(db_contact, new_contact)
+        for field, value in merged.items():
+            setattr(db_contact, field, value)
+        db_contact.is_draft = False
 
-    await db.commit()
-    await db.refresh(db_contact)
+        await db.commit()
+        await db.refresh(db_contact)
 
-    if db_contact.google_contact_id and current_user:
-        from app.services import google_contacts_service
+        if db_contact.google_contact_id and current_user:
+            from app.services import google_contacts_service
 
-        try:
-            await google_contacts_service.update_google_contact(
-                _contact_to_pydantic(db_contact),
-                db_contact.google_contact_id,
-                db,
-                current_user.email,
-            )
-        except Exception as e:
-            logger.error("Erro ao sincronizar merge com Google: %s", e)
+            try:
+                await google_contacts_service.update_google_contact(
+                    _contact_to_pydantic(db_contact),
+                    db_contact.google_contact_id,
+                    db,
+                    current_user.email,
+                )
+            except Exception as e:
+                logger.error("Erro ao sincronizar merge com Google: %s", e)
 
-    if current_user:
-        if new_contact.send_email:
-            from app.services.email_dispatch import dispatch_media_kit_email_bg
+        if current_user:
+            if new_contact.send_email:
+                from app.services.email_dispatch import dispatch_media_kit_email_bg
 
-            background_tasks.add_task(
-                dispatch_media_kit_email_bg,
-                contact_id=db_contact.id,
-                sender_email=current_user.email,
-                sender_name=current_user.name,
-                language=new_contact.email_language,
-            )
-        else:
-            db_contact.email_status = "skipped"
-            await db.commit()
+                background_tasks.add_task(
+                    dispatch_media_kit_email_bg,
+                    contact_id=db_contact.id,
+                    sender_email=current_user.email,
+                    sender_name=current_user.name,
+                    language=new_contact.email_language,
+                )
+            else:
+                db_contact.email_status = "skipped"
+                await db.commit()
+                # Re-load attributes after second commit to avoid MissingGreenlet
+                # when _contact_to_dict accesses expired columns in async context.
+                await db.refresh(db_contact)
 
-    return _contact_to_dict(db_contact)
+        return _contact_to_dict(db_contact)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Erro no merge do contato %s: %s", contact_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Falha ao mesclar contato. Tente novamente.")
 
 
 @router.get("/contacts/{contact_id}")
