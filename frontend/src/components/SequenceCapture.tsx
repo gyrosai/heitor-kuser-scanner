@@ -11,7 +11,7 @@ import {
 } from "@/lib/pendingScans";
 import { useToast } from "./Toast";
 import CaptureHeader from "./scan/CaptureHeader";
-import SequenceThumbStrip from "./scan/BurstThumbStrip";
+import SequenceThumbStrip from "./scan/SequenceThumbStrip";
 
 interface SequenceCaptureProps {
   onClose: () => void;

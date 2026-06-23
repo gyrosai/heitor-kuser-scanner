@@ -20,7 +20,7 @@ import {
 } from "@/lib/api";
 import { countByStatus } from "@/lib/pendingScans";
 import { useToast } from "@/components/Toast";
-import SequenceCapture from "@/components/BatchCapture";
+import SequenceCapture from "@/components/SequenceCapture";
 import CardCapture from "@/components/CardCapture";
 import ContactEditor from "@/components/ContactEditor";
 import ContactPreview, { LAST_EVENT_KEY } from "@/components/ContactPreview";
