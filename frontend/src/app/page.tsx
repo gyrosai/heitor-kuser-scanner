@@ -159,7 +159,7 @@ export default function Home() {
     async (editedContact: ContactData, force: boolean) => {
       setSaving(true);
       try {
-        await saveContact(editedContact, contactId ?? undefined, force);
+        await saveContact(editedContact, contactId ?? undefined, force, { downloadVCard: true });
         if (editedContact.event_tag) {
           try {
             localStorage.setItem(LAST_EVENT_KEY, editedContact.event_tag);
