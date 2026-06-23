@@ -80,6 +80,8 @@ export default function ReviewCarousel({
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState<ConflictError | null>(null);
   const [savedCount, setSavedCount] = useState(0);
+  const [replacedCount, setReplacedCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -184,12 +186,17 @@ export default function ReviewCarousel({
     }
   };
 
-  const finalize = () => {
-    if (savedCount > 0) {
-      showToast(
-        `${savedCount} contato${savedCount === 1 ? "" : "s"} salvo${savedCount === 1 ? "" : "s"}`,
-        "success",
-      );
+  const finalize = (extraSaved = 0, extraReplaced = 0, extraSkipped = 0) => {
+    const total = savedCount + extraSaved + replacedCount + extraReplaced + skippedCount + extraSkipped;
+    if (total > 0) {
+      const parts: string[] = [`${total} contato${total === 1 ? "" : "s"} processado${total === 1 ? "" : "s"}`];
+      const s = savedCount + extraSaved;
+      if (s > 0) parts.push(`${s} salvo${s === 1 ? "" : "s"}`);
+      const r = replacedCount + extraReplaced;
+      if (r > 0) parts.push(`${r} substituído${r === 1 ? "" : "s"}`);
+      const sk = skippedCount + extraSkipped;
+      if (sk > 0) parts.push(`${sk} pulado${sk === 1 ? "" : "s"}`);
+      showToast(parts.join(" · "), "success");
     }
     onClose();
   };
@@ -234,8 +241,7 @@ export default function ReviewCarousel({
       );
     }
 
-    try {
-      await saveContact(payload, current.scan.contact_id ?? undefined, false);
+    const commitScan = async () => {
       if (payload.event_tag) {
         try {
           localStorage.setItem(LAST_EVENT_KEY, payload.event_tag);
@@ -246,24 +252,41 @@ export default function ReviewCarousel({
         status: "saved",
         extracted_data: payload,
       });
-      // Limpeza imediata: foto não é mais necessária no IndexedDB.
       await deletePendingScan(current.scan.id);
-      setSavedCount((n) => n + 1);
-      // Remove do array em memória.
       setItems((prev) => prev.filter((_, idx) => idx !== currentIndex));
-      // Não incrementa o índice — o próximo agora ocupa a mesma posição.
-      if (finishAfter) {
-        finalize();
-      } else if (currentIndex >= items.length - 1) {
-        // Era o último.
-        finalize();
+    };
+
+    try {
+      await saveContact(payload, current.scan.contact_id ?? undefined, false, { downloadVCard: false });
+      await commitScan();
+      setSavedCount((n) => n + 1);
+      if (finishAfter || currentIndex >= items.length - 1) {
+        finalize(1, 0, 0);
       }
     } catch (err) {
       if (err instanceof ApiConflictError) {
-        setConflict(err.conflict);
+        const strategy = sequenceEmailConfig?.conflictStrategy ?? "ask";
+        if (strategy === "replace" || strategy === "keep_both") {
+          try {
+            await saveContact(payload, current.scan.contact_id ?? undefined, true, { downloadVCard: false });
+            await commitScan();
+            setReplacedCount((n) => n + 1);
+            showToast(`${payload.name} substituído (já existia)`, "info");
+            if (finishAfter || currentIndex >= items.length - 1) {
+              finalize(0, 1, 0);
+            }
+          } catch (forceErr) {
+            console.error("[ReviewCarousel] force save failed:", forceErr);
+            showToast(`Erro ao substituir ${payload.name}. Pulando.`, "error");
+          }
+        } else {
+          // ask: exibe modal DuplicateModal existente
+          setConflict(err.conflict);
+          return;
+        }
         return;
       }
-      console.error("Erro ao salvar:", err);
+      console.error("[ReviewCarousel] save failed:", err);
       showToast(
         err instanceof Error ? err.message : "Erro ao salvar contato",
         "error",
@@ -287,7 +310,7 @@ export default function ReviewCarousel({
       setSavedCount((n) => n + 1);
       setItems((prev) => prev.filter((_, idx) => idx !== currentIndex));
       setConflict(null);
-      if (currentIndex >= items.length - 1) finalize();
+      if (currentIndex >= items.length - 1) finalize(1, 0, 0);
     } catch (err) {
       console.error("Erro no merge:", err);
       showToast("Falha ao mesclar contato. Tente novamente.", "error");
@@ -310,7 +333,7 @@ export default function ReviewCarousel({
       setSavedCount((n) => n + 1);
       setItems((prev) => prev.filter((_, idx) => idx !== currentIndex));
       setConflict(null);
-      if (currentIndex >= items.length - 1) finalize();
+      if (currentIndex >= items.length - 1) finalize(1, 0, 0);
     } catch (err) {
       console.error("Erro ao forçar criação:", err);
       showToast(
