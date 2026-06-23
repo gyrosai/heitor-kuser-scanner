@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
-    ALLOWED_ORIGINS: str = "*"
+    ALLOWED_ORIGINS: str = "http://localhost:3000"  # default só pra dev local
     ENV: str = "development"
     PORT: int = 8000
     DATABASE_URL: str = ""
@@ -20,7 +20,13 @@ class Settings(BaseSettings):
     
     @property
     def origins_list(self) -> List[str]:
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        if self.ENV == "production" and "*" in origins:
+            raise ValueError(
+                "ALLOWED_ORIGINS cannot include '*' in production with credentials. "
+                "Set explicit origins like 'https://your-frontend.vercel.app'"
+            )
+        return origins
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
