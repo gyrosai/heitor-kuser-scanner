@@ -153,9 +153,14 @@ export function LoginScreen({ onLogin, loading = false }: LoginScreenProps) {
           <p className="text-[9px] font-medium text-white/45 tracking-[1.4px] uppercase mb-1">
             DESENVOLVIDO POR
           </p>
-          <p className="text-[12px] font-bold text-white/75">
+          <a
+            href="https://www.gyrosai.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12px] font-bold text-white/75 hover:underline"
+          >
             Gyros AI Solutions
-          </p>
+          </a>
         </div>
       </div>
     </div>

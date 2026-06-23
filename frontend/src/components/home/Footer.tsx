@@ -18,9 +18,14 @@ export function Footer({ onAbout }: FooterProps) {
       <p className="text-[10px] font-medium text-text-subtle uppercase tracking-[1.2px] mb-1">
         Desenvolvido por
       </p>
-      <p className="text-[13px] font-bold text-gyros-roxo tracking-[0.4px]">
+      <a
+        href="https://www.gyrosai.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[13px] font-bold text-gyros-roxo tracking-[0.4px] hover:underline"
+      >
         Gyros AI Solutions
-      </p>
+      </a>
     </div>
   );
 }
