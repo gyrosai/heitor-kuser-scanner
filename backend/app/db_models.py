@@ -25,7 +25,7 @@ class ScannedContact(Base):
     tags = Column(ARRAY(String), nullable=False, server_default="{}")
     card_image = Column(LargeBinary, nullable=True)
     is_draft = Column(Boolean, nullable=False, server_default="true")
-    idioma_email = Column(String(10), nullable=False, server_default="pt-BR")
+    idioma_email = Column(String(10), nullable=True)  # DEPRECATED: dropar na Etapa 5
     observacao_audio_url = Column(String(500), nullable=True)
     updated_at = Column(
         DateTime(timezone=True),
@@ -38,7 +38,7 @@ class ScannedContact(Base):
     # NULL em email_status = nunca tentou enviar.
     email_status = Column(String(20), nullable=True)             # sent|failed|queued|skipped
     email_sent_at = Column(DateTime(timezone=True), nullable=True)
-    email_language = Column(String(2), nullable=True)            # ISO 639-1: pt|en|es
+    email_language = Column(String(10), nullable=True)           # pt-BR|en|es
     email_error = Column(Text, nullable=True)
     email_gmail_message_id = Column(String(64), nullable=True)
     email_attempted_at = Column(DateTime(timezone=True), nullable=True)
@@ -48,7 +48,7 @@ class EmailLog(Base):
     __tablename__ = "email_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    contact_id = Column(Integer, ForeignKey("scanned_contacts.id"), nullable=True, index=True)
+    contact_id = Column(Integer, ForeignKey("scanned_contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     to_email = Column(String(255), nullable=False)
     sent_by_email = Column(String(255), nullable=False, index=True)
     sent_by_name = Column(String(255), nullable=True)

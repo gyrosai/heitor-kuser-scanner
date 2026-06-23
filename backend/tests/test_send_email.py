@@ -20,10 +20,9 @@ def _make_contact(**overrides) -> ScannedContact:
     c.name = "João Silva"
     c.email = "joao@example.com"
     c.event_tag = "CIMI2026"
-    c.idioma_email = "pt-BR"
     c.email_status = None
     c.email_sent_at = None
-    c.email_language = None
+    c.email_language = "pt-BR"
     c.email_gmail_message_id = None
     c.email_error = None
     c.email_attempted_at = None
@@ -64,10 +63,10 @@ async def test_send_email_success():
 
     assert result.status == "sent"
     assert result.gmail_message_id == "gmail_abc123"
-    assert result.language == "pt"
+    assert result.language == "pt-BR"
     assert result.quota_remaining == 99
     assert contact.email_status == "sent"
-    assert contact.email_language == "pt"
+    assert contact.email_language == "pt-BR"
     assert contact.email_gmail_message_id == "gmail_abc123"
     assert contact.email_error is None
     assert contact.email_attempted_at is not None
@@ -90,7 +89,7 @@ async def test_send_email_no_email_returns_contact_has_no_email():
 async def test_send_email_already_sent_returns_already_sent():
     """Contato que já recebeu e-mail: retorna already_sent sem reenviar."""
     sent_at = datetime.now(timezone.utc)
-    contact = _make_contact(email_status="sent", email_sent_at=sent_at, email_language="pt")
+    contact = _make_contact(email_status="sent", email_sent_at=sent_at, email_language="pt-BR")
     user = _make_user()
     db = _make_db()
 
@@ -98,7 +97,7 @@ async def test_send_email_already_sent_returns_already_sent():
 
     assert result.status == "already_sent"
     assert result.sent_at == sent_at
-    assert result.language == "pt"
+    assert result.language == "pt-BR"
     db.commit.assert_not_called()
 
 
@@ -108,7 +107,7 @@ async def test_send_email_force_reenvia():
     contact = _make_contact(
         email_status="sent",
         email_sent_at=datetime.now(timezone.utc),
-        email_language="pt",
+        email_language="pt-BR",
     )
     user = _make_user()
     db = _make_db()

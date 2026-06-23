@@ -33,7 +33,7 @@ async def test_email(
         email = to
         name = nome
         event_tag = evento
-        idioma_email = idioma
+        email_language = idioma
         tags: list = []
 
     log = await _enviar(_FakeContato(), current_user.email, current_user.name, db)

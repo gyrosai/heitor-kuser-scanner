@@ -222,6 +222,18 @@ async def delete_google_contact(
         await _persist_refreshed_token(credentials, db, user_email)
         return True
 
+    except HttpError as e:
+        if e.resp.status == 404:
+            logger.warning(
+                "Contato já inexistente no Google Contacts (%s) para %s — nada a deletar",
+                resource_name,
+                user_email,
+            )
+            return True
+        logger.error(
+            "Erro ao deletar no Google Contacts (%s): %s", resource_name, e
+        )
+        return False
     except Exception as e:
         logger.error(
             "Erro ao deletar no Google Contacts (%s): %s", resource_name, e

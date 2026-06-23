@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 # ── Tipos compartilhados ──────────────────────────────────────────────────────
 EmailStatus = Literal["sent", "failed", "queued", "skipped"]
-Language = Literal["pt", "en", "es"]
+Language = Literal["pt-BR", "en", "es"]
 
 ALLOWED_TAGS = ["Patrocínio", "Palestrante", "Parceria", "Cliente", "Mídia", "Follow-up"]
 
@@ -43,9 +43,8 @@ class ContactData(BaseModel):
     incomplete: bool = False
     importance: Optional[int] = Field(None, ge=1, le=3)
     tags: list[str] = []
-    idioma_email: Literal["pt-BR", "en", "es"] = "pt-BR"
+    email_language: Language = "pt-BR"
     send_email: bool = False
-    email_language: Optional[Language] = None
 
     @field_validator("importance", mode="before")
     @classmethod

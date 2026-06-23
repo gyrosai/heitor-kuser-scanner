@@ -15,8 +15,8 @@ from app.services.google_gmail_service import send_via_gmail
 
 logger = logging.getLogger(__name__)
 
-_LANG_TO_IDIOMA: dict[str, str] = {"pt": "pt-BR", "en": "en", "es": "es"}
-_IDIOMA_TO_LANG: dict[str, str] = {"pt-BR": "pt", "en": "en", "es": "es"}
+_LANG_TO_IDIOMA: dict[str, str] = {"pt-BR": "pt-BR", "en": "en", "es": "es"}
+_IDIOMA_TO_LANG: dict[str, str] = {"pt-BR": "pt-BR", "en": "en", "es": "es"}
 
 
 class EmailDispatchResult(NamedTuple):
@@ -45,7 +45,7 @@ async def dispatch_media_kit_email(
         db: AsyncSession da request (ou sessão isolada em bg tasks).
         contact: instância ScannedContact carregada na mesma sessão.
         user: objeto com .email e .name (CurrentUser ou duck-type).
-        language: override de idioma ("pt"|"en"|"es"); None = usar contact.idioma_email.
+        language: override de idioma ("pt"|"en"|"es"); None = usar contact.email_language.
         force: se True, reenvia mesmo que email_status == "sent".
     """
     if not contact.email:
@@ -65,8 +65,8 @@ async def dispatch_media_kit_email(
         idioma = _LANG_TO_IDIOMA.get(language, DEFAULT_LANGUAGE)
         email_lang = language
     else:
-        idioma = contact.idioma_email or DEFAULT_LANGUAGE
-        email_lang = _IDIOMA_TO_LANG.get(idioma, "pt")
+        idioma = contact.email_language or DEFAULT_LANGUAGE
+        email_lang = _IDIOMA_TO_LANG.get(idioma, "pt-BR")
 
     # Marcar tentativa antes da chamada (auditoria)
     contact.email_attempted_at = datetime.now(timezone.utc)
