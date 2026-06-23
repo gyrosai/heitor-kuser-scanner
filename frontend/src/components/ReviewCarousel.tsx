@@ -22,8 +22,14 @@ import Field from "./Field";
 import StarRating from "./StarRating";
 import TagChips from "./TagChips";
 
+interface SequenceEmailConfig {
+  sendKit: boolean;
+  language: "pt-BR" | "en" | "es";
+}
+
 interface ReviewCarouselProps {
   startIndex?: number;
+  sequenceEmailConfig?: SequenceEmailConfig | null;
   onClose: () => void;
   onOpenList: () => void;
 }
@@ -53,6 +59,7 @@ function scanToForm(scan: PendingScan, defaultEventTag: string | null): ContactD
 
 export default function ReviewCarousel({
   startIndex = 0,
+  sequenceEmailConfig = null,
   onClose,
   onOpenList,
 }: ReviewCarouselProps) {
@@ -181,6 +188,10 @@ export default function ReviewCarousel({
       ...current.form,
       name: current.form.name.trim(),
       event_tag: current.form.event_tag?.trim() || null,
+      ...(sequenceEmailConfig != null && {
+        send_email: sequenceEmailConfig.sendKit,
+        email_language: sequenceEmailConfig.language,
+      }),
     };
 
     try {

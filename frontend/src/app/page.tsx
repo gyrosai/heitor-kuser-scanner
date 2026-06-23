@@ -18,6 +18,7 @@ import {
   saveContact,
   scanCard,
 } from "@/lib/api";
+import type { EmailLanguage } from "@/lib/types";
 import { countByStatus } from "@/lib/pendingScans";
 import { useToast } from "@/components/Toast";
 import SequenceCapture from "@/components/SequenceCapture";
@@ -34,6 +35,7 @@ import ProcessingScreen from "@/components/ProcessingScreen";
 import QueueScreen from "@/components/QueueScreen";
 import ReviewCarousel from "@/components/ReviewCarousel";
 import ReviewListView from "@/components/ReviewListView";
+import SequenceKitConfig from "@/components/SequenceKitConfig";
 import pkg from "../../package.json";
 
 const appVersion = pkg.version;
@@ -53,8 +55,11 @@ type AppState =
   | "sequence_capture"
   | "queue"
   | "processing"
+  | "sequence_kit_config"
   | "review_carousel"
   | "review_list";
+
+type SequenceEmailConfig = { sendKit: boolean; language: EmailLanguage };
 
 export default function Home() {
   const { showToast } = useToast();
@@ -70,6 +75,7 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [sequenceEmailConfig, setSequenceEmailConfig] = useState<SequenceEmailConfig | null>(null);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
   const [oauthExpired, setOauthExpired] = useState(false);
   const [ocrFailed, setOcrFailed] = useState(false);
@@ -278,6 +284,12 @@ export default function Home() {
     handleLogin();
   };
 
+  const clearSequenceState = useCallback(() => {
+    setState("home");
+    setSequenceEmailConfig(null);
+    setReviewIndex(0);
+  }, []);
+
   const handleOpenAbout = () => setState("about");
 
   const handleOpenContact = (id: number) => {
@@ -463,8 +475,26 @@ export default function Home() {
           }}
           onDone={() => {
             setReviewIndex(0);
+            setState("sequence_kit_config");
+          }}
+        />
+      );
+    }
+
+    if (state === "sequence_kit_config") {
+      return (
+        <SequenceKitConfig
+          contactCount={pendingCount}
+          emailQuota={emailQuota}
+          onStart={(config) => {
+            setSequenceEmailConfig(config);
             setState("review_carousel");
           }}
+          onSkip={() => {
+            setSequenceEmailConfig({ sendKit: false, language: "pt-BR" });
+            setState("review_carousel");
+          }}
+          onBack={() => setState("queue")}
         />
       );
     }
@@ -473,10 +503,11 @@ export default function Home() {
       return (
         <ReviewCarousel
           startIndex={reviewIndex}
+          sequenceEmailConfig={sequenceEmailConfig}
           onClose={() => {
             void refreshPendingCount();
             setHistoryKey((k) => k + 1);
-            setState("home");
+            clearSequenceState();
           }}
           onOpenList={() => setState("review_list")}
         />
