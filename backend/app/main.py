@@ -20,11 +20,12 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+is_prod = settings.ENV == "production"
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SESSION_SECRET_KEY,
-    same_site="lax",
-    https_only=settings.ENV == "production",
+    same_site="none" if is_prod else "lax",
+    https_only=is_prod,
     max_age=60 * 60 * 24 * 30,
 )
 
