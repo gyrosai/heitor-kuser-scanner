@@ -1,6 +1,6 @@
 export const ALLOWED_TAGS = [
   "Patrocínio",
-  "Palestrante",
+  "Instrutor",
   "Parceria",
   "Cliente",
   "Mídia",

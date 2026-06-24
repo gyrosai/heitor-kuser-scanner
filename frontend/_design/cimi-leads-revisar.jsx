@@ -40,7 +40,7 @@ const FONT_STACK = '"Montserrat", system-ui, -apple-system, sans-serif';
 
 const INTEREST_TYPES = [
   'Patrocínio',
-  'Palestrante',
+  'Instrutor',
   'Parceria',
   'Cliente',
   'Mídia',

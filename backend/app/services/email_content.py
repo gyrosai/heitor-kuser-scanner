@@ -19,7 +19,7 @@ AFTERMOVIE_URLS = {
 }
 
 BODIES = {
-    "pt-BR": """Prezado(a) {primeiro_nome},
+    "pt-BR": """Olá, {primeiro_nome},
 
 Foi uma satisfação lhe conhecer no {evento}.
 
@@ -31,14 +31,14 @@ Esperamos receber mais de 8.000 participantes, incluindo representantes de mais 
 
 Para identificarmos sinergias, você teria disponibilidade para uma reunião nos próximos dias?
 
-Enquanto isso, aproveito para lhe enviar em anexo o Mídia Kit do CIMI360, em que encontrará mais informações à respeito do evento.
+Enquanto isso, envio em anexo o Mídia Kit do CIMI360, com mais informações sobre o evento.
 
 Abaixo, segue também o aftermovie da última edição do CIMI360:
 {aftermovie_url}
 
 Aguardo seu retorno e permaneço à disposição.""",
 
-    "en": """Dear {primeiro_nome},
+    "en": """Hello, {primeiro_nome},
 
 It was a pleasure meeting you at {evento}.
 
@@ -50,14 +50,14 @@ We expect to welcome over 8,000 participants, including representatives from mor
 
 Would you be available for a meeting in the coming days to explore potential synergies?
 
-In the meantime, I have attached the CIMI360 Media Kit, which contains more information about the event.
+In the meantime, I am sending the CIMI360 Media Kit as an attachment, with more information about the event.
 
 The aftermovie from the last edition of CIMI360 is also below:
 {aftermovie_url}
 
 I look forward to hearing from you and remain at your disposal.""",
 
-    "es": """Estimado(a) {primeiro_nome}:
+    "es": """Hola, {primeiro_nome},
 
 Fue un placer conocerte en el {evento}.
 
@@ -69,7 +69,7 @@ Esperamos recibir a más de 8000 participantes, incluidos representantes de más
 
 Con el fin de identificar sinergias, ¿tendría disponibilidad para una reunión en los próximos días?
 
-Mientras tanto, le envío en adjunto el kit de prensa de CIMI360, donde encontrará más información sobre el evento.
+Mientras tanto, le envío adjunto el kit de prensa del CIMI360, con más información sobre el evento.
 
 Le envío también el aftermovie de la última edición de CIMI360:
 {aftermovie_url}

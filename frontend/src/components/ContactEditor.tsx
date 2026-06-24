@@ -403,7 +403,7 @@ export default function ContactEditor({
 
             <div>
               <p className="text-xs font-semibold text-text-muted mb-2">
-                {/* TODO: "Palestrante" é palavra banida pelo brand guide CIMI360 — remover/renomear na revisão de brand */}
+                {/* TODO: "Instrutor" — verificar alinhamento com brand guide CIMI360 */}
                 Tipo de interesse
               </p>
               <div className="flex flex-wrap gap-2">

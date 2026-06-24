@@ -43,7 +43,7 @@ const FONT_STACK = '"Montserrat", system-ui, -apple-system, sans-serif';
 
 const INTEREST_TYPES = [
   'Patrocínio',
-  'Palestrante',
+  'Instrutor',
   'Parceria',
   'Cliente',
   'Mídia',
@@ -59,7 +59,7 @@ export default function App() {
   // Form state
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [emailLang, setEmailLang] = useState('pt');
-  const [interest, setInterest] = useState('Palestrante');
+  const [interest, setInterest] = useState('Instrutor');
   const [importance, setImportance] = useState(2);
   const [invest, setInvest] = useState({ active: true, sub: 'parceria' });
   const [cimi360, setCimi360] = useState({ active: true, sub: 'stand' });
