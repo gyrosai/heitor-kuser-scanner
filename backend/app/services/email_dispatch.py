@@ -5,8 +5,8 @@ from typing import NamedTuple, Optional
 from googleapiclient.errors import HttpError
 from sqlalchemy.future import select
 
-from app.db_models import ScannedContact
-from app.services.email_content import DEFAULT_LANGUAGE
+from app.db_models import EmailLog, ScannedContact
+from app.services.email_content import CONTENT_VERSION, DEFAULT_LANGUAGE
 from app.services.email_quota import QuotaExceededError as LocalQuotaError
 from app.services.email_quota import check_daily_quota
 from app.services.email_templates.media_kit import render_plain_body, render_subject
@@ -96,6 +96,21 @@ async def dispatch_media_kit_email(
             error=contact.email_error,
         )
 
+    log = EmailLog(
+        contact_id=contact.id,
+        to_email=contact.email,
+        sent_by_email=user.email,
+        sent_by_name=user.name,
+        subject=subject,
+        idioma=idioma,
+        status="queued",
+        classificacoes_snapshot=classificacao_tags,
+        template_version=CONTENT_VERSION,
+    )
+    db.add(log)
+    await db.commit()
+    await db.refresh(log)
+
     try:
         result = await send_via_gmail(
             user_email=user.email,
@@ -112,6 +127,10 @@ async def dispatch_media_kit_email(
         contact.email_language = email_lang
         contact.email_gmail_message_id = (result.get("id") or "")[:64]
         contact.email_error = None
+        log.status = "sent"
+        log.gmail_message_id = result.get("id")
+        log.gmail_thread_id = result.get("threadId")
+        log.sent_at = now
         await db.commit()
         logger.info(
             "Media kit enviado: contact_id=%s to=%s lang=%s msg_id=%s",
@@ -131,6 +150,8 @@ async def dispatch_media_kit_email(
     except (GmailQuotaError, LocalQuotaError) as e:
         contact.email_status = "failed"
         contact.email_error = str(e)[:255]
+        log.status = "quota_exceeded"
+        log.error_message = str(e)[:1000]
         await db.commit()
         logger.warning("Quota Gmail: contact_id=%s: %s", contact.id, e)
         return EmailDispatchResult(status="quota_exhausted", error=str(e)[:255])
@@ -138,6 +159,8 @@ async def dispatch_media_kit_email(
     except HttpError as e:
         contact.email_status = "failed"
         contact.email_error = str(e)[:255]
+        log.status = "failed"
+        log.error_message = str(e)[:1000]
         await db.commit()
         logger.error("Gmail API error: contact_id=%s: %s", contact.id, e)
         return EmailDispatchResult(status="gmail_api_error", error=str(e)[:255])
@@ -145,6 +168,8 @@ async def dispatch_media_kit_email(
     except Exception as e:
         contact.email_status = "failed"
         contact.email_error = str(e)[:255]
+        log.status = "failed"
+        log.error_message = str(e)[:1000]
         await db.commit()
         logger.error("Falha ao enviar media kit: contact_id=%s: %s", contact.id, e)
         return EmailDispatchResult(status="failed", error=str(e)[:255])
