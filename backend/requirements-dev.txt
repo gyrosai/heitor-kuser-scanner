@@ -1,0 +1,6 @@
+# Dependências de desenvolvimento/teste (não vão para produção).
+# Instalar: pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+pytest==8.4.2
+pytest-asyncio==1.2.0
+aiosqlite==0.20.0

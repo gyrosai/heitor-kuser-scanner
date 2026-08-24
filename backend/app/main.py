@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.routers import auth, email, scan, transcribe
+from app.routers import auth, email, materials, scan, transcribe
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +41,15 @@ app.include_router(scan.router)
 app.include_router(auth.router)
 app.include_router(transcribe.router)
 app.include_router(email.router)
+app.include_router(materials.router)
 
 
 @app.on_event("startup")
 async def startup():
     if settings.DATABASE_URL:
         try:
-            from app.database import Base, engine
             import app.db_models  # noqa: F401 — registra models no Base.metadata
+            from app.database import Base, engine
 
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)

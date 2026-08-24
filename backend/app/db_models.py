@@ -1,8 +1,22 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+# JSONB no Postgres (produção), JSON genérico no SQLite (testes com aiosqlite).
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class ScannedContact(Base):
@@ -62,6 +76,60 @@ class EmailLog(Base):
     template_version = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Material(Base):
+    """Material de um produto: link externo ou evento (missão comercial).
+
+    kind: "link" (url) | "evento" (url + meta.date/meta.location).
+    Templates de mensagem (kind "texto" no CSV) vivem em MessageTemplate.
+    Idioma segue o CSV: NULL | PT | ENG | ESP.
+    """
+
+    __tablename__ = "materials"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_key", "group_name", "label", "language", name="uq_material_identity"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    product_key = Column(Text, nullable=False)
+    group_name = Column(Text, nullable=False)
+    label = Column(Text, nullable=False)
+    kind = Column(Text, nullable=False)            # link | evento
+    language = Column(Text, nullable=True)         # NULL | PT | ENG | ESP
+    url = Column(Text, nullable=True)
+    meta = Column(JSONType, nullable=False, server_default="{}", default=dict)
+    sort_order = Column(Integer, nullable=False, server_default="0", default=0)
+    active = Column(Boolean, nullable=False, server_default="false", default=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class MessageTemplate(Base):
+    """Template de mensagem padrão por produto (linhas tipo "texto" do CSV).
+
+    body aceita placeholders {nome} {primeiro_nome} {evento} {produto}.
+    """
+
+    __tablename__ = "message_templates"
+    __table_args__ = (
+        UniqueConstraint("product_key", "name", name="uq_template_identity"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    product_key = Column(Text, nullable=False)
+    name = Column(Text, nullable=False)
+    body = Column(Text, nullable=False)
+    active = Column(Boolean, nullable=False, server_default="true", default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class GoogleAuth(Base):
