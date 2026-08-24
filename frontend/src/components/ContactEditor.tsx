@@ -7,10 +7,9 @@ import {
   ContactData,
   ContactRecord,
   EmailLanguage,
-  classificacoesToTags,
   isInterestTag,
-  tagsToClassificacoes,
 } from "@/lib/types";
+import { classificacoesToTags, tagsToClassificacoes } from "@/lib/taxonomy";
 import {
   deleteContact,
   getContact,

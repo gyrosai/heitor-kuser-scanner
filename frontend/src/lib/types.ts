@@ -1,5 +1,10 @@
 import rawTaxonomy from "./taxonomy.json";
 
+// classificacoesToTags/tagsToClassificacoes: implementação única vive em
+// ./taxonomy.ts (consciente da taxonomia real, incluindo perfis legados).
+// Reexportadas aqui só por compatibilidade com imports existentes de "@/lib/types".
+export { classificacoesToTags, tagsToClassificacoes } from "./taxonomy";
+
 export const ALLOWED_TAGS: string[] = rawTaxonomy.interest_types;
 
 export type Importance = 1 | 2 | 3 | null;
@@ -8,26 +13,6 @@ export type EmailLanguage = "pt-BR" | "en" | "es";
 
 /** Estado de classificação: { product_key: slug | null } */
 export type ClassificacaoState = Record<string, string | null>;
-
-export function classificacoesToTags(state: ClassificacaoState): string[] {
-  const tags: string[] = [];
-  for (const [key, slug] of Object.entries(state)) {
-    if (slug) tags.push(`${key}:${slug}`);
-  }
-  return tags;
-}
-
-export function tagsToClassificacoes(tags: string[]): ClassificacaoState {
-  const state: ClassificacaoState = {};
-  for (const tag of tags) {
-    const idx = tag.indexOf(":");
-    if (idx === -1) continue;
-    const key = tag.slice(0, idx);
-    const slug = tag.slice(idx + 1);
-    state[key] = slug;
-  }
-  return state;
-}
 
 export interface ContactData {
   name: string;

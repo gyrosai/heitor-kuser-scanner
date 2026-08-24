@@ -80,6 +80,7 @@ Também existe no editor a seção "Mídia kit por e-mail": checkbox "Enviar Mí
 - Migrations sempre aditivas (`ADD COLUMN IF NOT EXISTS`), nunca `DROP`, com `pg_dump` antes. `backup_*.sql` nunca vai pro repo.
 - Validators que filtram silenciosamente precisam ser atualizados junto com qualquer taxonomia nova (ou passar a retornar 422).
 - Nunca usar API não-oficial de WhatsApp. Envio é via `wa.me`.
+- **Taxonomia: editar só `shared/taxonomy.json` e rodar `python3 scripts/sync_taxonomy.py`.** `frontend/src/lib/taxonomy.json` e `backend/app/taxonomy.json` são cópias reais (não symlink) — o pre-commit hook `check-taxonomy-sync` bloqueia commit se alguma divergir.
 
 ## 6. O que está sendo pedido agora (Henrique, mapa mental de 22/08)
 

@@ -2,7 +2,12 @@
  * Taxonomia CIMI Leads — cliente com cache e fallback hardcoded.
  *
  * Consome GET /api/taxonomy com stale-while-revalidate.
- * Se a rede falhar, usa o JSON embutido (copiado de shared/taxonomy.json no build).
+ * Se a rede falhar, usa o JSON embutido em ./taxonomy.json.
+ *
+ * IMPORTANTE: ./taxonomy.json é uma CÓPIA sincronizada de shared/taxonomy.json
+ * (fonte editável). Editar só shared/taxonomy.json e rodar
+ * scripts/sync_taxonomy.py — o pre-commit hook check-taxonomy-sync bloqueia
+ * commit se divergir.
  */
 import rawTaxonomy from "./taxonomy.json";
 
@@ -23,7 +28,7 @@ export interface Taxonomy {
   interest_types: string[];
 }
 
-const FALLBACK_TAXONOMY: Taxonomy = rawTaxonomy as Taxonomy;
+export const FALLBACK_TAXONOMY: Taxonomy = rawTaxonomy as Taxonomy;
 
 let memoryCache: Taxonomy | null = null;
 const LOCAL_KEY = "cimi_taxonomy_v1";
@@ -194,11 +199,30 @@ export function classificacoesToTags(state: Record<string, string | null>): stri
   return tags;
 }
 
-/** Converte tags em estado de classificação (todos os produtos conhecidos presentes). */
+/**
+ * Converte tags em estado de classificação (todos os produtos conhecidos
+ * presentes, com `null` para os não classificados).
+ *
+ * Aceita a taxonomia explicitamente (`tagsToClassificacoes(taxonomy, tags)`,
+ * usada por quem já carregou via getTaxonomyCached) ou só as tags
+ * (`tagsToClassificacoes(tags)`), caso em que usa FALLBACK_TAXONOMY — a
+ * mesma fonte embutida (./taxonomy.json) usada como fallback de rede em
+ * qualquer lugar do app.
+ */
+export function tagsToClassificacoes(
+  tags: string[],
+): Record<string, string | null>;
 export function tagsToClassificacoes(
   taxonomy: Taxonomy,
   tags: string[],
+): Record<string, string | null>;
+export function tagsToClassificacoes(
+  taxonomyOrTags: Taxonomy | string[],
+  maybeTags?: string[],
 ): Record<string, string | null> {
+  const taxonomy = Array.isArray(taxonomyOrTags) ? FALLBACK_TAXONOMY : taxonomyOrTags;
+  const tags = Array.isArray(taxonomyOrTags) ? taxonomyOrTags : maybeTags ?? [];
+
   const state: Record<string, string | null> = {};
   for (const p of taxonomy.products) {
     state[p.key] = null;

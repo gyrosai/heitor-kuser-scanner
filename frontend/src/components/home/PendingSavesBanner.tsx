@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CloudOff, RefreshCw } from "lucide-react";
+import { AlertCircle, CloudOff, RefreshCw } from "lucide-react";
 import { Banner, Button } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import {
@@ -14,11 +14,16 @@ import { flushSaveQueue, isFlushAuthBlocked } from "@/lib/saveQueue";
 interface PendingSavesBannerProps {
   /** Chamado quando o reenvio manual sobe pelo menos um contato */
   onFlushed?: () => void;
+  /** Abre o contato no editor (usado pela ação de "precisa de revisão") */
+  onOpenContact?: (id: number) => void;
 }
 
 // Banner persistente: contatos que falharam por rede e aguardam reenvio.
 // Não some sozinho — só quando a fila esvaziar de fato.
-export function PendingSavesBanner({ onFlushed }: PendingSavesBannerProps) {
+export function PendingSavesBanner({
+  onFlushed,
+  onOpenContact,
+}: PendingSavesBannerProps) {
   const { showToast } = useToast();
   const [items, setItems] = useState<PendingSave[]>([]);
   const [flushing, setFlushing] = useState(false);
@@ -44,10 +49,19 @@ export function PendingSavesBanner({ onFlushed }: PendingSavesBannerProps) {
 
   if (items.length === 0) return null;
 
-  const n = items.length;
+  // needs_review = flush automático desistiu (rede esgotou tentativas OU o
+  // backend rejeitou o payload com 422). Nenhum dos dois casos é reenviado
+  // sozinho — por isso ficam num banner separado, sem o "Reenviar agora".
+  const reviewItems = items.filter((i) => i.needs_review);
+  const pendingItems = items.filter((i) => !i.needs_review);
+
+  const n = pendingItems.length;
   const plural = n === 1 ? "" : "s";
-  const struggling = items.some((i) => i.attempts > 3);
-  const needsReview = items.filter((i) => i.needs_review).length;
+  const struggling = pendingItems.some((i) => i.attempts > 3);
+
+  const reviewN = reviewItems.length;
+  const reviewPlural = reviewN === 1 ? "" : "s";
+  const reviewTarget = reviewItems.find((i) => i.contact_id != null);
 
   const handleFlush = async () => {
     setFlushing(true);
@@ -81,34 +95,57 @@ export function PendingSavesBanner({ onFlushed }: PendingSavesBannerProps) {
   };
 
   return (
-    <div className="px-5 pt-[14px]">
-      <Banner
-        variant="warning"
-        icon={<CloudOff size={18} className="text-warning-fg" />}
-        title={
-          authBlocked
-            ? `${n} contato${plural} aguardando reconexão do Google`
-            : `${n} contato${plural} aguardando envio`
-        }
-        description={
-          needsReview > 0
-            ? `${needsReview} excedeu o limite de tentativas automáticas — use "Reenviar agora" ou verifique sua conexão.`
-            : struggling
+    <div className="px-5 pt-[14px] flex flex-col gap-2">
+      {reviewN > 0 && (
+        <Banner
+          variant="danger"
+          icon={<AlertCircle size={18} className="text-danger-fg" />}
+          title={`${reviewN} contato${reviewPlural} precisa${reviewN === 1 ? "" : "m"} de revisão`}
+          description={
+            reviewTarget?.last_error ||
+            "O backend rejeitou os dados salvos. Abra no editor pra corrigir."
+          }
+          actions={
+            reviewTarget ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenContact?.(reviewTarget.contact_id!)}
+              >
+                Abrir no editor
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {n > 0 && (
+        <Banner
+          variant="warning"
+          icon={<CloudOff size={18} className="text-warning-fg" />}
+          title={
+            authBlocked
+              ? `${n} contato${plural} aguardando reconexão do Google`
+              : `${n} contato${plural} aguardando envio`
+          }
+          description={
+            struggling
               ? "Várias tentativas de reenvio falharam. Verifique sua conexão."
               : "Serão reenviados automaticamente quando houver conexão."
-        }
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={flushing}
-            leftIcon={<RefreshCw size={13} />}
-            onClick={() => void handleFlush()}
-          >
-            Reenviar agora
-          </Button>
-        }
-      />
+          }
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={flushing}
+              leftIcon={<RefreshCw size={13} />}
+              onClick={() => void handleFlush()}
+            >
+              Reenviar agora
+            </Button>
+          }
+        />
+      )}
     </div>
   );
 }

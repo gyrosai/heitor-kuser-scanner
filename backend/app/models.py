@@ -18,19 +18,6 @@ logger = logging.getLogger(__name__)
 ALLOWED_TAGS = list(INTEREST_TYPES)
 
 
-def _is_valid_tag(tag: str) -> bool:
-    """Validação rápida (True/False) usada por leituras e CSV.
-
-    Não levanta exceção — retorna False para qualquer tag inválida.
-    """
-    if not isinstance(tag, str):
-        return False
-    if tag in ALLOWED_TAGS_SET:
-        return True
-    ok, _ = is_valid_classification(tag)
-    return ok
-
-
 class ContactData(BaseModel):
     name: str
     phone: Optional[str] = None

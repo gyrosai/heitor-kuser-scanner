@@ -22,12 +22,8 @@ import Field from "./Field";
 import StarRating from "./StarRating";
 import TagChips from "./TagChips";
 import ClassificacaoSection from "./contact/ClassificacaoSection";
-import {
-  type ClassificacaoState,
-  classificacoesToTags,
-  isInterestTag,
-  tagsToClassificacoes,
-} from "@/lib/types";
+import { type ClassificacaoState, isInterestTag } from "@/lib/types";
+import { classificacoesToTags, tagsToClassificacoes } from "@/lib/taxonomy";
 
 interface SequenceEmailConfig {
   sendKit: boolean;

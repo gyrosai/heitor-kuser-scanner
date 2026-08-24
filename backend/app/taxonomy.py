@@ -1,7 +1,12 @@
 """Fonte única da taxonomia CIMI Leads.
 
-Carrega shared/taxonomy.json na importação e deriva todas as listas de validação.
-Nenhum outro arquivo deve hardcodar produtos, perfis ou tags de interesse.
+Carrega backend/app/taxonomy.json na importação e deriva todas as listas de
+validação. Nenhum outro arquivo deve hardcodar produtos, perfis ou tags de
+interesse.
+
+IMPORTANTE: shared/taxonomy.json é a fonte EDITÁVEL. Este arquivo é uma cópia
+sincronizada — editar só shared/taxonomy.json e rodar scripts/sync_taxonomy.py
+(o pre-commit hook check-taxonomy-sync bloqueia commit se divergir).
 """
 from __future__ import annotations
 
@@ -12,7 +17,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_TAXONOMY_PATH = Path(__file__).resolve().parent.parent.parent / "shared" / "taxonomy.json"
+_TAXONOMY_PATH = Path(__file__).resolve().parent / "taxonomy.json"
 
 
 def _load_taxonomy() -> dict[str, Any]:
@@ -111,6 +116,10 @@ def parse_classification_tags(tags: list[str]) -> dict[str, str]:
     return result
 
 
+# Ordem de exibição dos produtos (usada no CSV)
+PRODUCTS_ORDER: list[str] = [p["key"] for p in PRODUCTS]
+
+
 def format_csv_columns(classifications: dict[str, str]) -> tuple[str, str]:
     """Formata as colunas 'produtos' e 'perfis' para CSV export.
 
@@ -127,7 +136,3 @@ def format_csv_columns(classifications: dict[str, str]) -> tuple[str, str]:
         produto_labels.append(label)
         perfil_labels.append(f"{label}: {profile_label}")
     return "; ".join(produto_labels), "; ".join(perfil_labels)
-
-
-# Ordem de exibição dos produtos (usada no CSV)
-PRODUCTS_ORDER: list[str] = [p["key"] for p in PRODUCTS]

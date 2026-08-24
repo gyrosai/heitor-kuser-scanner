@@ -1,0 +1,1053 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "11",
+        "title": "Backend taxonomy source of truth",
+        "description": "Expose the canonical taxonomy from a single backend module and make it the source of truth for products, profiles, and interest tags.",
+        "details": "Implement backend/app/taxonomy.py with immutable constants for INTEREST_TYPES, PRODUCTS, and derived ALLOWED_TAGS. Preserve legacy CIMI Invest profiles in read/validate paths only where required by the PRD, but remove them from the UI-facing profiles list. Add GET /api/taxonomy returning {interest_types, products} with products ordered as CIMI 360, CIMI Invest, Leilão, INDIP, Feirão. Keep the module versioned in the repo and avoid hardcoding taxonomy elsewhere. Pseudo-code: `INTEREST_TYPES = [...]`; `PRODUCTS = [{key,label,profiles:[...]}]`; `ALLOWED_TAGS = set(INTEREST_TYPES) | set(all profiles from PRODUCTS) | legacy profiles`; `return JSONResponse({...})`. Ensure backend validators reference ALLOWED_TAGS so no valid tag is dropped.",
+        "testStrategy": "Add pytest coverage that GET /api/taxonomy returns the exact product order and all expected profiles. Add validator tests asserting every taxonomy tag is accepted and invalid tags return 422.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define canonical taxonomy constants and allowlist",
+            "description": "Create backend/app/taxonomy.py as the single canonical taxonomy module with immutable INTEREST_TYPES and PRODUCTS constants, plus derived ALLOWED_TAGS that includes all interest types, all UI-facing product profiles, and any required legacy CIMI Invest profiles for backend read/validate compatibility.",
+            "dependencies": [],
+            "details": "Use immutable structures where possible (tuples/frozensets or frozen dataclasses) and keep the module self-contained and versioned in the repo. Define PRODUCTS in the exact required order: CIMI 360, CIMI Invest, Leilão, INDIP, Feirão. Ensure legacy CIMI Invest profiles are excluded from the UI-facing product profile lists but still represented in the validation allowlist when needed by the PRD. Export only the canonical data needed by other backend modules and avoid duplicating taxonomy literals elsewhere.",
+            "status": "pending",
+            "testStrategy": "Unit test the module constants for immutability intent, exact product ordering, and ALLOWED_TAGS membership covering interest types, all product profiles, and legacy CIMI Invest exceptions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Expose canonical taxonomy via GET /api/taxonomy",
+            "description": "Implement GET /api/taxonomy to return the canonical taxonomy payload with interest_types and products, matching the backend source of truth and preserving the specified product order.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a read-only API handler that serializes the taxonomy module into JSONResponse with shape {interest_types, products}. Ensure the response only exposes UI-facing product profiles, keeps products ordered as CIMI 360, CIMI Invest, Leilão, INDIP, Feirão, and does not hardcode labels or profiles in the route layer. Keep the endpoint lightweight and read-only so all consumers can rely on the shared module.",
+            "status": "pending",
+            "testStrategy": "API test asserting status 200, payload shape, exact product order, and that response values match the shared taxonomy module.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Wire backend validators to shared ALLOWED_TAGS",
+            "description": "Refactor backend validators and any shared validation helpers to use taxonomy.ALLOWED_TAGS so valid product/profile/interest tags are accepted consistently across the backend.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Replace any scattered allowlists or inline validation constants with imports from the taxonomy module. Ensure validators accept every tag in ALLOWED_TAGS and reject unknown tags with the expected validation error semantics. Keep the implementation centralized so future taxonomy changes only require updating backend/app/taxonomy.py.",
+            "status": "pending",
+            "testStrategy": "Validator tests for accepted taxonomy tags and 422 responses for invalid tags, plus a regression test ensuring no known tag is dropped during validation.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Handle legacy CIMI Invest compatibility exceptions",
+            "description": "Preserve legacy CIMI Invest profiles only in backend read and validation paths where required, while preventing them from appearing in the UI-facing taxonomy list.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Add explicit handling for legacy CIMI Invest profile values in read/validate code paths so historical data remains accepted and retrievable. Ensure these legacy values are not emitted by /api/taxonomy or any UI-oriented product/profile list. Document the compatibility boundary in code comments so the exception stays constrained to backend compatibility layers.",
+            "status": "pending",
+            "testStrategy": "Regression tests for legacy CIMI Invest reads and validation acceptance, alongside tests confirming those legacy labels are absent from the API taxonomy response.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add backend tests for taxonomy and validation",
+            "description": "Add backend test coverage for taxonomy ordering, API serialization, validator allowlist behavior, and legacy CIMI Invest compatibility rules.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create pytest cases that verify GET /api/taxonomy returns the exact product order and expected profiles, that ALLOWED_TAGS includes every valid tag, and that invalid tags are rejected. Include focused tests for legacy CIMI Invest read/validate exceptions and confirm UI-facing lists exclude them. Keep tests deterministic and tightly scoped to the taxonomy source of truth.",
+            "status": "pending",
+            "testStrategy": "Pytest suite covering endpoint response order, allowlist completeness, invalid-tag 422s, and legacy compatibility regressions.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down the work into: define immutable taxonomy constants and derived allowed tags, implement the /api/taxonomy endpoint, wire validators to use the shared allowlist, handle legacy CIMI Invest read/validate exceptions, and add backend tests for ordering and validation.",
+        "updatedAt": "2026-08-24T17:30:51.023Z"
+      },
+      {
+        "id": "12",
+        "title": "Classification storage migration",
+        "description": "Add classification persistence support for the expanded product set while preserving compatibility with existing contacts and history.",
+        "details": "Extend the contact classification model to support the existing single-profile-per-product behavior across five products. If the current relational structure cannot represent the new products cleanly, migrate to a jsonb column shaped like `{product_key: profile}` using an idempotent additive migration. Add a migration script that converts existing CIMI 360 and CIMI Invest records without loss, preserves legacy CIMI Invest profiles in historical reads/CSV, and rejects invalid values with 422. Keep old records readable in UI/history, but only offer current profiles in editors. Pseudo-code: `if legacy_schema_inadequate: add classification jsonb`; `migrate_row(old)->new_jsonb`; `validate(product, profile in taxonomy[product])`.",
+        "testStrategy": "Use migration tests against a seeded database to verify idempotent conversion, preserved legacy reads, and 422 on invalid product/profile combinations. Add a regression test confirming existing production tags remain accepted.",
+        "priority": "high",
+        "dependencies": [
+          "11"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Assess current classification schema fit for five products",
+            "description": "Review the current contact classification persistence model and determine whether the existing relational schema can represent the expanded five-product profile set without losing single-profile-per-product behavior.",
+            "dependencies": [],
+            "details": "Inspect entity definitions, join tables, indexes, API payload shapes, and any current constraints around CIMI 360 and CIMI Invest. Document gaps for new products, historical read requirements, and whether a backward-compatible relational extension is feasible before choosing jsonb.",
+            "status": "pending",
+            "testStrategy": "Produce a schema assessment note with explicit pass/fail criteria for relational feasibility and backward-compatibility risks.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Design migration target data model and conversion rules",
+            "description": "Design the target persistence approach and migration plan, selecting either additive relational changes or a jsonb column shaped like {product_key: profile} with idempotent application.",
+            "dependencies": [
+              1
+            ],
+            "details": "Define the final data shape, mapping rules from old records to new structure, and how legacy CIMI Invest values are preserved in historical reads and CSV exports. Specify null/empty handling, product ordering, and how future products will be represented without additional schema churn.",
+            "status": "pending",
+            "testStrategy": "Validate the design against representative records and confirm it can represent all required products and legacy values losslessly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Apply additive schema changes for classification storage",
+            "description": "Implement the additive schema change required for the new classification storage model, keeping the migration safe for existing deployments.",
+            "dependencies": [
+              2
+            ],
+            "details": "Add the new jsonb column or equivalent additive fields, along with any indexes or constraints needed for query performance and integrity. Ensure the migration is non-destructive, reversible where practical, and safe to run alongside existing production data.",
+            "status": "pending",
+            "testStrategy": "Run migration-up and migration-down smoke checks on a clean database and an existing schema snapshot to verify compatibility.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Backfill legacy classification records idempotently",
+            "description": "Create an idempotent backfill/conversion script that migrates existing CIMI 360 and CIMI Invest records into the new storage format without data loss.",
+            "dependencies": [
+              3
+            ],
+            "details": "Convert each existing row into the new product-keyed representation, preserving exact profile values and avoiding duplicate writes on re-run. Make the migration additive and repeatable, with guards that skip already-converted rows and retain original semantics for unchanged data.",
+            "status": "pending",
+            "testStrategy": "Seed a database with mixed legacy and partially migrated rows, run the backfill twice, and confirm identical final state and no data loss.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Maintain legacy compatibility for reads and CSV exports",
+            "description": "Preserve legacy behavior for historical reads, UI history views, and CSV export while restricting editors to current profiles only.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Wire read paths so old CIMI Invest profiles remain visible in history and exports, even if they are no longer editable. Keep editor inputs aligned with the current taxonomy, map legacy values only where required, and ensure old records continue rendering correctly in the UI.",
+            "status": "pending",
+            "testStrategy": "Add regression tests for history rendering and CSV output that confirm legacy CIMI Invest profiles remain visible while editor options exclude deprecated values.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Add validation and regression tests for classification persistence",
+            "description": "Add validation and regression coverage to ensure accepted values persist correctly and invalid product/profile combinations return 422.",
+            "dependencies": [
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Implement request and persistence validation against the canonical taxonomy, enforcing one profile per product and rejecting unsupported values. Cover current production tags, legacy compatibility cases, and invalid combinations across all five products.",
+            "status": "pending",
+            "testStrategy": "Write migration tests against a seeded database plus API validation tests for valid product/profile pairs, invalid values, and expected 422 responses.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Split the migration into schema assessment, migration design, additive schema changes, idempotent data backfill/conversion, legacy compatibility handling for reads and CSV, and validation/regression tests for accepted and rejected values.",
+        "updatedAt": "2026-08-24T17:55:57.657Z"
+      },
+      {
+        "id": "13",
+        "title": "Frontend classification UI expansion",
+        "description": "Update the frontend classification editor and related views to consume taxonomy from the backend and preserve state across editor, batch review, and history.",
+        "details": "Refactor the existing classification UI to render five products with the existing checkbox + single-radio-per-product pattern, ordered exactly as specified. Fetch profiles from /api/taxonomy via a cached client helper; never hardcode profile lists in the frontend. Preserve selected state in ContactEditor, the batch review carousel, and historical views. Support backward compatibility for legacy CIMI Invest labels in reads, but only expose the new taxonomy choices in the UI. Pseudo-code: `taxonomy = await getTaxonomyCached()`; `products.map(renderProductChipAndRadioGroup(product.profiles))`; `onChange(updateClassification(productKey, selectedProfile))`.",
+        "testStrategy": "Add vitest component tests verifying product order, radio options sourced from API data, and state persistence across editor/batch/history render paths. Add snapshot or interaction tests for legacy records displaying correctly.",
+        "priority": "medium",
+        "dependencies": [
+          "11",
+          "12"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add cached taxonomy client helper",
+            "description": "Create a cached frontend helper that fetches taxonomy from /api/taxonomy and exposes ordered products and profiles to the UI. The helper must avoid hardcoded lists and provide a stable shape for editor, batch review, and history components.",
+            "dependencies": [
+              11,
+              12
+            ],
+            "details": "Implement a shared client utility such as getTaxonomyCached() with in-memory caching, request de-duplication, and typed normalization of the backend response. Ensure callers can safely consume product order and profile lists without duplicating constants in components.",
+            "status": "pending",
+            "testStrategy": "Unit test the helper for caching behavior, single-flight fetches, and correct parsing of mocked /api/taxonomy responses.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Refactor ContactEditor to use backend taxonomy",
+            "description": "Refactor the ContactEditor classification UI to render the five products from fetched taxonomy data using the existing checkbox and single-radio-per-product interaction pattern. Preserve the selected classification state during edits and updates.",
+            "dependencies": [
+              1
+            ],
+            "details": "Replace any hardcoded product/profile configuration with data from the cached taxonomy helper. Render products in the exact backend-defined order, map each product to a checkbox plus radio group, and wire onChange handlers to update the selected profile per product while keeping component state controlled.",
+            "status": "pending",
+            "testStrategy": "Component tests should verify product order, radio options sourced from API data, and state updates when users toggle classifications.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Preserve classification state in batch review carousel",
+            "description": "Update the batch review carousel so classifications remain visible and editable across items using the same taxonomy-driven product rendering as the editor. Ensure the selected state persists while navigating between records.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Reuse the shared taxonomy data and classification state model in the carousel view. Keep the UI consistent with the editor, hydrate each batch item from stored classification values, and avoid resetting selections when moving between cards or re-rendering.",
+            "status": "pending",
+            "testStrategy": "Interaction tests should navigate across batch items and confirm selections persist and render consistently after carousel transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Handle legacy CIMI Invest labels in history views",
+            "description": "Adjust historical classification views to display saved classifications correctly while supporting backward compatibility for legacy CIMI Invest labels on reads. The UI must only expose the new taxonomy choices for editing and selection.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Add a compatibility layer that maps legacy stored CIMI Invest labels into the historical display path without surfacing deprecated options in interactive controls. Ensure read-only history screens render legacy records faithfully while the editable taxonomy list remains backend-driven and current.",
+            "status": "pending",
+            "testStrategy": "Snapshot or regression tests should cover legacy records rendering in history views and confirm deprecated labels do not appear in editable UI controls.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add UI tests for ordering and persistence",
+            "description": "Add frontend tests covering ordering, taxonomy-driven options, and state persistence across editor, batch review, and history pathways. Include regression coverage for legacy compatibility behavior and ensure no hardcoded taxonomy assumptions remain.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Write vitest component and interaction tests that mock /api/taxonomy, assert exact product ordering, verify options come from the response, and exercise persistence across the three main views. Include at least one legacy fixture to validate compatibility behavior and display consistency.",
+            "status": "pending",
+            "testStrategy": "Run vitest component tests plus snapshot or interaction tests for editor, carousel, and history views with mocked taxonomy and legacy records.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Decompose into API client updates for taxonomy fetching/caching, editor component refactor, batch review carousel updates, history view compatibility, legacy CIMI Invest label rendering, and UI tests for ordering and persistence."
+      },
+      {
+        "id": "14",
+        "title": "Health endpoint with Google token status",
+        "description": "Provide health visibility for Google token state so the operator can verify readiness before scanning and saving leads.",
+        "details": "Extend GET /api/health to include google_token_status with values valid, expired, or absent based on backend token inspection. Keep the response fast and safe for the frontend to poll. Make sure the endpoint uses structured logging and does not expose secrets. Pseudo-code: `status = inspect_google_token(); return {ok: true, google_token_status: status}`. Add a small frontend status indicator where the operator can see whether reconnection is needed before the event.",
+        "testStrategy": "Add backend tests for valid/expired/absent token states. Add a frontend test that renders the health indicator correctly for each status.",
+        "priority": "high",
+        "dependencies": [
+          "11"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement safe Google token inspection for health checks",
+            "description": "Add backend logic to inspect the Google token state and return one of valid, expired, or absent without exposing secrets or blocking the request path.",
+            "dependencies": [],
+            "details": "Implement a fast token-inspection helper used by GET /api/health, with structured logs that record only the token state and any safe diagnostic flags. Ensure the endpoint response shape becomes { ok: true, google_token_status: status } and that inspection avoids leaking access tokens, refresh tokens, headers, or raw error payloads. Keep the check lightweight enough for frequent polling and define clear state mapping rules for each backend condition.",
+            "status": "pending",
+            "testStrategy": "Backend unit tests for inspect_google_token mapping of valid, expired, and absent states; verify health response shape and confirm no secret values appear in logs or response payloads.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add frontend health indicator for token readiness",
+            "description": "Extend the health endpoint and frontend to surface the Google token state as a small operator-facing readiness indicator.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update the health API contract and frontend polling/display logic so the UI shows a compact reconnection-needed indicator based on google_token_status. Present clear visual states for valid, expired, and absent, and keep the component unobtrusive so operators can quickly verify readiness before scanning or saving leads. Ensure frontend state handling remains resilient if the health endpoint is temporarily unavailable.",
+            "status": "pending",
+            "testStrategy": "Frontend component test to render the indicator correctly for valid, expired, and absent states; integration test to confirm the UI updates from a mocked /api/health response.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Cover token-status health behavior with backend and frontend tests",
+            "description": "Add coverage for all backend and frontend token states, plus safety checks for structured logging and secret handling.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create tests that cover every token state end-to-end: valid, expired, and absent. Validate that the health endpoint remains fast, returns the expected status field, and does not expose sensitive token data. Add a frontend test suite for the indicator and, if practical, an assertion that logs remain structured and sanitized when inspection fails or returns an unexpected condition.",
+            "status": "pending",
+            "testStrategy": "Backend tests for all token states and response shape; frontend tests for the indicator rendering; optional log-safety assertions using mocked logger output.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 3,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Expand into backend token inspection logic, health response enrichment, logging/safety review, frontend status indicator implementation, and tests for all token states."
+      },
+      {
+        "id": "15",
+        "title": "Shared package composition service",
+        "description": "Create the shared materials and package composition layer used by email and, optionally, WhatsApp.",
+        "details": "Implement backend/app/services/package.py to assemble a message body from a template plus selected materials filtered by product and language. Add support for placeholder replacement for {nome}, {primeiro_nome}, {evento}, and {produto}, removing missing placeholders cleanly instead of leaving undefined text. Ensure only materials with URLs are included in the final package; inactive or blank-link items are excluded and previewed as omitted. Reuse this service for the current post-save email pipeline and later WhatsApp composition. Pseudo-code: `render_template(template.body, context)`; `selected_materials = materials.filter(active && url && matches product/language)`; `body += format_lines(selected_materials)`.",
+        "testStrategy": "Add pytest tests for placeholder rendering, missing-value cleanup, material filtering by active/url/language, and package output stability. Add regression tests proving the legacy media-kit path still renders when no product is chosen.",
+        "priority": "high",
+        "dependencies": [
+          "11",
+          "12",
+          "13"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Build template rendering and placeholder cleanup",
+            "description": "Implement the shared template renderer in backend/app/services/package.py to substitute {nome}, {primeiro_nome}, {evento}, and {produto} from the provided context, and remove unresolved placeholders cleanly so no raw tokens remain in the output.",
+            "dependencies": [],
+            "details": "Create a small rendering helper that normalizes missing/empty context values to blank strings, performs safe placeholder replacement, and post-processes the result to collapse artifacts from missing values. Keep the API reusable for email now and WhatsApp later.",
+            "status": "pending",
+            "testStrategy": "Unit tests for all placeholder combinations, including missing values, empty strings, and partial context; assert no unresolved braces remain.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement material filtering rules",
+            "description": "Add material selection logic that filters shared materials by active status, non-empty URL, product match, and language match, while tracking excluded items for preview/diagnostics.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement filtering predicates that only admit materials with a usable URL and active flag, then constrain by product and language. Produce an omitted list with reasons such as inactive, blank link, or mismatch so downstream previews can explain exclusions.",
+            "status": "pending",
+            "testStrategy": "Unit tests for each exclusion reason and for accepted items across product/language combinations; verify omitted reasons are deterministic.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Compose the final package output",
+            "description": "Assemble the final package body by combining the rendered template with the formatted list of selected materials, preserving stable ordering and clean line formatting.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Define the package composition flow as template render first, then append formatted material lines in a predictable order. Ensure final output trims extra whitespace, handles empty material sets gracefully, and returns a structure suitable for existing email pipeline integration.",
+            "status": "pending",
+            "testStrategy": "Snapshot-style tests for output stability and formatting with zero, one, and multiple materials; verify whitespace and line breaks.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add legacy media-kit fallback behavior",
+            "description": "Preserve legacy media-kit behavior when no product is chosen by falling back to the existing path, while still using the new shared service when product-scoped composition is available.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Add a compatibility branch that detects the no-product case and routes to the legacy media-kit rendering path. Keep the new shared package service as the default for product-aware flows so the current post-save email pipeline can reuse it without breaking older behavior.",
+            "status": "pending",
+            "testStrategy": "Regression tests proving legacy media-kit output still renders when no product is selected and that product-scoped requests use the new service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add unit and regression tests",
+            "description": "Create comprehensive pytest coverage for placeholder replacement, material filtering, package formatting, and legacy fallback across different product and language combinations.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Cover happy paths and edge cases: missing context values, blank URLs, inactive materials, mismatched languages/products, output ordering, and package stability. Include regression tests to ensure the legacy path still works and that omitted items are reported as excluded rather than silently included.",
+            "status": "pending",
+            "testStrategy": "Pytest suite with unit and regression cases across language/product matrices, plus assertions for omission reporting and output snapshots.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break the service into template rendering/placeholder replacement, material filtering rules, package assembly/output formatting, legacy media-kit fallback behavior, and unit/regression tests for different language/product combinations."
+      },
+      {
+        "id": "16",
+        "title": "Materials storage and admin APIs",
+        "description": "Add materials persistence and administration APIs, including CSV import, list/read/update, and reordering.",
+        "details": "Create the materials table with the PRD schema: id, product, group, label, language nullable, url, sort_order, active, meta jsonb, created_at. Implement GET/PUT-style admin endpoints and an idempotent CSV import endpoint keyed by (product, group, label, language). Accept the Henrique CSV layout, mark rows without URLs as inactive, and keep all operations guarded by X-Admin-Token from environment config. Pseudo-code: `upsert_material(unique_key, fields)`; `if not url: active=false`; `sort_order = provided_or_append`.",
+        "testStrategy": "Add pytest coverage for CSV import idempotency, admin authentication, list/update/reorder behavior, and inactive-material handling. Verify duplicate rows update rather than create new records.",
+        "priority": "medium",
+        "dependencies": [
+          "15"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design materials table schema and constraints",
+            "description": "Design the materials table schema to match the PRD, including column types, nullable language, JSONB metadata, timestamps, and the uniqueness strategy needed for idempotent upserts.",
+            "dependencies": [],
+            "details": "Define the table columns id, product, group, label, language, url, sort_order, active, meta, and created_at. Specify indexes and a composite unique constraint on (product, group, label, language) to support idempotent import behavior and stable updates.",
+            "status": "pending",
+            "testStrategy": "Validate the migration against an ephemeral database, confirm column types and constraints, and assert the unique key prevents duplicate records for the same material identity.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create migration for materials persistence",
+            "description": "Implement the database migration that creates the materials table and supporting indexes, ensuring the schema is applied safely and can be rolled back cleanly.",
+            "dependencies": [
+              1
+            ],
+            "details": "Write the migration for the new materials table, include defaults for active and sort_order where appropriate, and add any needed indexes for lookup and ordering. Ensure created_at is populated automatically and meta is stored as JSONB.",
+            "status": "pending",
+            "testStrategy": "Run migration up/down tests in CI and verify the resulting schema matches the expected structure and constraints in a fresh database.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement Henrique CSV import parser",
+            "description": "Build the CSV parser for the Henrique layout and map its fields into normalized material records ready for import.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Parse the Henrique CSV columns, normalize product/group/label/language/url values, and convert missing URLs into inactive records. Preserve unknown or extra CSV data inside meta when useful, and prepare records for deterministic upsert processing.",
+            "status": "pending",
+            "testStrategy": "Use fixture CSV files covering valid rows, missing URLs, blank language cells, and extra columns to confirm parsing and normalization behave correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement idempotent material upsert logic",
+            "description": "Implement idempotent upsert logic keyed by product, group, label, and language so repeated imports update existing rows instead of creating duplicates.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Create a reusable upsert_material function that finds the material by the unique key, updates mutable fields, appends sort_order when not provided, and sets active to false when url is absent. Ensure conflicts resolve predictably and repeated imports produce the same final state.",
+            "status": "pending",
+            "testStrategy": "Add tests that import the same CSV twice, verify row counts stay stable, and confirm existing rows are updated rather than duplicated when values change.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Enforce admin token authentication",
+            "description": "Add authentication enforcement for every admin materials endpoint using the X-Admin-Token header from environment configuration.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Check the incoming X-Admin-Token against the configured admin token before allowing list, read, update, reorder, or import operations. Return unauthorized responses consistently and keep the guard reusable across all admin routes.",
+            "status": "pending",
+            "testStrategy": "Write API tests for missing, invalid, and valid admin tokens, confirming protected endpoints reject unauthorized requests and allow authorized ones.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Build materials CRUD, import, and reorder APIs",
+            "description": "Implement the full admin API surface for listing, reading, updating, importing, and reordering materials.",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Provide GET endpoints for list/read, PUT-style updates for editable fields, a CSV import endpoint, and a reorder endpoint that updates sort_order deterministically. Ensure list responses are ordered by sort_order and include active state plus metadata for admin usage.",
+            "status": "pending",
+            "testStrategy": "Create endpoint tests for list ordering, read-by-id, update persistence, reorder behavior, and import output, including checks that unauthorized requests are blocked.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Test inactive rules and import/update conflicts",
+            "description": "Cover inactive-material rules, import conflicts, and update/reorder edge cases with focused automated tests.",
+            "dependencies": [
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Add tests that verify rows without URLs are marked inactive, duplicate CSV rows update existing materials, and conflicting updates preserve the unique identity constraints. Include cases for nullable language handling, sort_order append behavior, and mixed active/inactive imports.",
+            "status": "pending",
+            "testStrategy": "Use pytest cases with CSV fixtures and direct API calls to validate inactive-item handling, conflict resolution, and stable ordering after repeated imports or edits.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Split into schema design and migration, CSV import parser, idempotent upsert logic, admin authentication enforcement, CRUD/list/reorder API endpoints, inactive-item rules, and tests for import/update conflicts."
+      },
+      {
+        "id": "17",
+        "title": "Materials admin interface",
+        "description": "Build the materials administration screen for operators to manage the link-based library inside the app.",
+        "details": "Implement a dedicated Materiais page in Next.js/Tailwind with grouping by product and group, showing active state, edit controls for label and url, and drag/reorder or explicit up/down controls. Use the shared cached materials client helper and keep the UI lightweight so it does not block scanning. No file uploads should be added. Pseudo-code: `const materials = await getMaterialsCached()`; `renderTableByProductGroup()`; `onSave(updateMaterial)`; `onToggleActive()`; `onReorder(moveItem)`. Ensure the page respects admin-token-protected endpoints.",
+        "testStrategy": "Add vitest UI tests for toggling active, editing label/url, and reorder actions. Add integration tests that mock the admin API and verify the page renders grouped materials correctly.",
+        "priority": "medium",
+        "dependencies": [
+          "15",
+          "16"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Build the materials admin page scaffold",
+            "description": "Create the Next.js admin page shell for the materials interface, including route, layout, title, and basic Tailwind styling that matches the app’s admin UX.",
+            "dependencies": [],
+            "details": "Add a dedicated /admin/materiais page component with a lightweight layout, page heading, loading/empty states, and responsive container structure. Keep the page focused on data presentation and admin actions without introducing heavy client-side features or file upload UI.",
+            "status": "pending",
+            "testStrategy": "Render the page and verify the route loads, the heading appears, and the basic skeleton/empty state is displayed before data arrives.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement grouped materials data loading and display",
+            "description": "Load materials through the shared cached client helper and render them grouped by product and group in a table or sectioned list.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use the shared getMaterialsCached helper to fetch data, then organize results by product and group for display. Implement renderTableByProductGroup behavior so operators can scan the library quickly, with clear product/group labels and visible active/inactive state.",
+            "status": "pending",
+            "testStrategy": "Mock the cached client and confirm grouped rendering order, product/group headings, and correct active-state labels in the UI.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add edit and active toggle controls",
+            "description": "Add inline edit controls for material label and URL, plus active-state toggling, with save actions wired to admin update endpoints.",
+            "dependencies": [
+              2
+            ],
+            "details": "Provide compact row-level or modal-based editors for label and url fields, and a toggle for active status. Wire onSave(updateMaterial) and onToggleActive() flows to preserve responsiveness and avoid blocking the scanning experience.",
+            "status": "pending",
+            "testStrategy": "Simulate editing label/url and toggling active state, then assert the correct update requests are issued and the UI reflects the saved values.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add reorder controls for grouped materials",
+            "description": "Implement ordering controls so operators can change material sort order using drag-and-drop or explicit up/down actions.",
+            "dependencies": [
+              2
+            ],
+            "details": "Support onReorder(moveItem) behavior with a lightweight interaction model, preferably explicit up/down controls if drag-and-drop adds too much complexity. Keep the sort order stable within each product/group bucket and update the UI immediately after reorder actions.",
+            "status": "pending",
+            "testStrategy": "Verify reorder interactions move items within the same grouping, update the visible order, and send the expected reorder payload to the backend.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Wire admin API integration and test coverage",
+            "description": "Connect the page to admin-token-protected APIs and add UI/integration coverage for loading, grouping, editing, toggling, and reordering.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Ensure all fetch/update calls use the admin-authenticated endpoints guarded by the X-Admin-Token contract. Add vitest UI tests and integration tests that mock the admin API, validate grouped rendering, confirm edit/toggle/reorder behavior, and ensure the cached materials helper is used.",
+            "status": "pending",
+            "testStrategy": "Run component and integration tests that mock protected API responses, assert admin-authenticated requests are made, and verify grouped materials render and update correctly.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Decompose into page scaffolding, grouped materials data loading, edit/toggle/reorder controls, admin-authenticated API integration, shared cached client usage, and UI/integration tests."
+      },
+      {
+        "id": "18",
+        "title": "Email package selection and preview UI",
+        "description": "Extend the email media-kit section in the contact editor to support product-specific package selection, preview, and resend behavior.",
+        "details": "Enhance the existing \"Mídia kit por e-mail\" section with a product selector, material checklist, and live preview driven by the shared package service. Preselect a single product when the contact has only one product classification. Auto-check materials from the group Institucional and those matching the chosen language (PT/EN/ES), but allow manual changes before send. Keep the legacy fixed media-kit behavior when no product is selected. Add a resend action from contact history that reuses the same composition pipeline. Pseudo-code: `if singleProduct: selectedProduct = that`; `selectedMaterials = autoPickByGroupAndLanguage()`; `preview = buildPackage(template, selectedMaterials)`; `sendOnSave = checkboxValue`.",
+        "testStrategy": "Add vitest tests for product auto-selection, default checkbox rules, preview content, legacy behavior without product, and resend entry points. Add a regression test that empty-url items are warned about and excluded from preview/send.",
+        "priority": "high",
+        "dependencies": [
+          "15",
+          "16"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define product-selection and preview state model",
+            "description": "Define the UI state model for the email media-kit section, including the selected product, selected language, auto-selected materials, manual overrides, preview state, and resend mode.",
+            "dependencies": [],
+            "details": "Create explicit state fields and derived values for the contact editor component so product choice, checklist state, and preview updates are predictable. Include reset behavior when switching contacts or entering resend flow.",
+            "status": "pending",
+            "testStrategy": "Unit tests for initial state, state reset on contact change, and derived state updates when product or language changes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement product selector and auto-preselect rule",
+            "description": "Implement the product selector logic, including preselection when the contact has exactly one product classification and fallback to no selection otherwise.",
+            "dependencies": [
+              1
+            ],
+            "details": "Wire the selector to contact classification data and ensure the single-product case auto-fills the selector while multi-product contacts remain user-driven. Keep the chosen product synchronized with the rest of the composition pipeline.",
+            "status": "pending",
+            "testStrategy": "Component tests verifying single-product auto-selection, multi-product manual selection, and clearing selection behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement material checklist default selection rules",
+            "description": "Add the default material auto-selection rules for the checklist, including the Institucional group and materials matching the chosen language.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Compute default checked items from shared package-service rules, then allow users to override individual checkboxes before send. Ensure defaults re-evaluate only when product or language context changes, not after manual edits.",
+            "status": "pending",
+            "testStrategy": "Tests for auto-checked Institucional items, language-based defaults for PT/EN/ES, and preservation of manual checkbox changes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Build live preview via shared package service",
+            "description": "Render a live package preview using the shared package service, updating as the selected product, language, or checklist changes.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Call the shared composition service to build the preview body and material list, and surface omitted items when they are inactive or missing URLs. Keep preview rendering in sync with current form state and show legacy output when appropriate.",
+            "status": "pending",
+            "testStrategy": "Snapshot and interaction tests confirming preview updates on selection changes and excludes invalid materials from the rendered output.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add legacy no-product fallback behavior",
+            "description": "Preserve the legacy fixed media-kit behavior when no product is selected so existing email flows continue to work.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Branch the composition path so the old fixed package experience is used when the selector is empty, including the same send and preview expectations used by the current contact editor. Ensure this path does not require product-specific defaults.",
+            "status": "pending",
+            "testStrategy": "Regression tests covering no-product scenarios, legacy preview output, and send behavior staying compatible with existing flows.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Integrate resend flow with shared composition pipeline",
+            "description": "Integrate the resend action from contact history so it reuses the same composition pipeline as the editor send flow.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Connect the history action to populate the same product, language, material, and preview state used by the main editor, then trigger the same save/send composition path. Make sure resend respects manual overrides and legacy fallback rules.",
+            "status": "pending",
+            "testStrategy": "End-to-end or component tests for resend entry points, state hydration from history, and reuse of the same send pipeline.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Write component and regression tests for email package UI",
+            "description": "Create component and regression coverage for the full email package selection flow, including edge cases such as empty-link materials.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Add targeted tests for selector state, default checklist rules, preview rendering, resend behavior, and legacy fallback. Include regression coverage ensuring items without URLs are warned about and excluded from preview and send payloads.",
+            "status": "pending",
+            "testStrategy": "Vitest tests for all main paths plus regression assertions for empty-url exclusions and warning behavior.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Break the feature into product selector state, auto-selection rules, material checklist defaults, live preview rendering via the shared package service, legacy fallback behavior, resend flow integration, and component/regression tests."
+      },
+      {
+        "id": "19",
+        "title": "Email send pipeline and send history",
+        "description": "Persist each sent package and extend the existing email send pipeline so package sends are recorded and replayable.",
+        "details": "Extend the current post-save Gmail SMTP workflow to accept product, language, material_ids, and template_id while preserving existing fields email_status, email_sent_at, and email_error. Create the sent_materials table with contact_id, channel, product, language, material_ids int[], message_snapshot, sent_at, and status. Record every send, including resend from history, with channel=email. If the contact has no valid email, disable sending and surface a clear UI message. Keep the legacy fixed media-kit send path available when no product is selected. Pseudo-code: `if !contact.email: disable`; `message = composePackage(...)`; `smtp.send(message)`; `insert sent_materials(...)`; `update email_status`.",
+        "testStrategy": "Add backend tests for successful send, missing-email disablement, legacy path compatibility, record insertion into sent_materials, and resend behavior. Add a mocked SMTP integration test verifying email_status/email_error transitions.",
+        "priority": "high",
+        "dependencies": [
+          "15",
+          "16",
+          "18"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend send pipeline contract for package parameters",
+            "description": "Define the backend contract for the email send pipeline so it accepts product, language, material_ids, and template_id while preserving email_status, email_sent_at, and email_error updates.",
+            "dependencies": [
+              15,
+              18
+            ],
+            "details": "Update the send endpoint/service signature, request validation, and internal payload mapping to carry the new fields without breaking existing callers. Keep the legacy fields in the response and persistence flow, and ensure the new parameters are optional enough to support the fixed media-kit path.",
+            "status": "pending",
+            "testStrategy": "Contract tests for request validation and response shape; verify old callers still work with omitted new fields.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add sent_materials schema and insert logic",
+            "description": "Create the sent_materials persistence layer to store every outbound email package and its snapshot for replay and audit purposes.",
+            "dependencies": [
+              15
+            ],
+            "details": "Add the sent_materials table with contact_id, channel, product, language, material_ids int[], message_snapshot, sent_at, and status. Include migration, model/entity, and repository functions to insert a record after every successful send, including resend actions, with channel fixed to email.",
+            "status": "pending",
+            "testStrategy": "Migration test for schema creation and repository test asserting inserted rows persist all required fields.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Hook package composition into SMTP send path",
+            "description": "Integrate shared package composition into the email send flow so the SMTP message is built from product, language, selected materials, and template.",
+            "dependencies": [
+              15,
+              18
+            ],
+            "details": "Wire the post-save Gmail SMTP workflow to call the shared package composer before send, then capture the rendered body/subject as the message_snapshot. Ensure the compose step handles the existing legacy media-kit behavior when no product is selected and that the final SMTP payload matches the composed package.",
+            "status": "pending",
+            "testStrategy": "Backend integration test mocking the composer and SMTP client to confirm composed content is sent and snapshot is captured.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement resend support through the same pipeline",
+            "description": "Ensure resend actions from contact history reuse the same package send pipeline and create a fresh durable history record.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Implement resend-from-history so it reconstructs the original send inputs or stored snapshot as needed, routes through the same SMTP pipeline, and inserts a new sent_materials record for the resend. Preserve traceability by linking to existing history data where possible without changing the channel value.",
+            "status": "pending",
+            "testStrategy": "Integration test covering resend from history, verifying SMTP is called again and a second sent_materials row is created.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Disable sends for contacts without valid email",
+            "description": "Block sending when a contact has no valid email address and surface a clear, user-facing message in the UI path.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Add backend validation that short-circuits send attempts when contact.email is empty or invalid, returns a structured error, and prevents SMTP execution and history insertion. Ensure the frontend can display a clear disablement message and that the send control is disabled for this state.",
+            "status": "pending",
+            "testStrategy": "Backend test for disabled send on missing email and UI-facing contract test for the returned message.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Preserve legacy fixed media-kit compatibility",
+            "description": "Keep the legacy fixed media-kit send path available when no product is selected so existing behavior remains intact.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Maintain the previous fixed package composition and send flow as the default fallback when product is null or unset. Verify that this path still updates email_status, email_sent_at, and email_error correctly while avoiding regressions in the newer product-specific branch.",
+            "status": "pending",
+            "testStrategy": "Regression test confirming no-product sends use the legacy path and still persist status fields correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add send pipeline and history test coverage",
+            "description": "Add backend and mocked SMTP tests that validate successful send, missing-email disablement, legacy compatibility, history persistence, and resend behavior.",
+            "dependencies": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Create end-to-end style backend tests that mock SMTP, assert email_status transitions on success/failure, verify email_error population, confirm sent_materials insertion for initial sends and resends, and prove the legacy path remains functional when product is absent.",
+            "status": "pending",
+            "testStrategy": "Mocked SMTP integration suite covering success, failure, disablement, legacy fallback, history insertion, and resend replay assertions.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Split into send-pipeline contract changes, sent_materials schema and persistence, message composition integration, resend support, missing-email disablement, legacy fixed-path compatibility, and backend/SMTP tests with history assertions."
+      },
+      {
+        "id": "20",
+        "title": "Structured events and event migration",
+        "description": "Add event persistence and migration so contacts can reference structured events while preserving the existing event_tag compatibility layer.",
+        "details": "Create the events table with the PRD schema and expose CRUD endpoints under /api/events. Add event_id nullable FK to scanned_contacts and, on save with event_id, populate event_tag with the event name for backward compatibility with filters and CSV. Implement migration scripts that convert existing free-text event_tag values into events idempotently using normalization (trim, case, spacing) and a dry-run report. Add UI support for selecting an active event and clearing it, with persistence across scans replacing localStorage-based event_tag storage. Pseudo-code: `event = selectEvent()`; `contact.event_id = event.id`; `contact.event_tag = event.name`; `migrateDistinctTagsToEvents()`.",
+        "testStrategy": "Add migration tests for idempotent conversion and deduped event creation. Add API tests for CRUD and contact save paths that verify event_id/event_tag coherence. Add UI tests for event selection persistence and clearing.",
+        "priority": "medium",
+        "dependencies": [
+          "11",
+          "12",
+          "19"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create events table schema and relational constraints",
+            "description": "Define the events persistence model using the PRD schema, including columns, indexes, constraints, and relationships needed for contact references and compatibility writes.",
+            "dependencies": [],
+            "details": "Add the events table with fields required by the product spec, ensure a unique normalized-name strategy is possible, and prepare the schema for a nullable foreign key from scanned_contacts. Include timestamps and any audit fields required by the backend conventions.",
+            "status": "pending",
+            "testStrategy": "Verify schema creation with migration tests and confirm indexes/constraints match the expected model.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Build /api/events CRUD endpoints",
+            "description": "Implement backend CRUD endpoints for events under /api/events so the UI and migration tooling can create, list, update, and deactivate events consistently.",
+            "dependencies": [
+              1
+            ],
+            "details": "Expose list/detail/create/update/delete style handlers or the API shape required by the app, validate payloads, and keep the contract aligned with the events schema. Ensure returned objects include the fields needed for selection and display.",
+            "status": "pending",
+            "testStrategy": "Add API tests covering CRUD success cases, validation failures, and response shape consistency.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add scanned_contacts event_id FK and compatibility writes",
+            "description": "Update scanned_contacts to reference events through a nullable event_id foreign key while preserving event_tag as a backward-compatible denormalized value.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Add the event_id column, wire save/update flows so selecting an event stores both event_id and event.name in event_tag, and ensure clearing the event removes the FK while keeping legacy filters stable. Keep the write path safe for existing scans and imports.",
+            "status": "pending",
+            "testStrategy": "Test contact save paths to confirm event_id/event_tag coherence for selected, cleared, and legacy records.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Write normalization-based event migration with dry-run",
+            "description": "Implement an idempotent migration that converts existing free-text event_tag values into structured events using normalization rules and produces a dry-run report.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Create migration scripts that normalize values by trimming, lowercasing, and collapsing spacing, dedupe equivalent tags into one event record, and update scanned_contacts to point at the created event rows. Support dry-run output showing planned creations, updates, and skipped duplicates without mutating data.",
+            "status": "pending",
+            "testStrategy": "Add migration tests for repeated runs, normalized deduping, and dry-run reporting without database mutation.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement event selection and clear behavior in the UI",
+            "description": "Add frontend support for choosing an active event, persisting that choice across scans, and clearing it without relying on localStorage event_tag state.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Replace the old event_tag-only client state with an event selector backed by the events API, persist the active event in the app state or approved storage mechanism, and ensure clearing the selection updates the UI and subsequent scans. Keep the display and save flow aligned with backend compatibility writes.",
+            "status": "pending",
+            "testStrategy": "Use UI tests to verify event selection persists across scans, can be cleared, and survives reload behavior as designed.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Add end-to-end tests for event persistence and migration",
+            "description": "Cover the full event workflow with backend and frontend tests to ensure structured persistence, migration correctness, and legacy compatibility remain coherent.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Add integration coverage for API CRUD, contact saves with event_id and event_tag synchronization, migration idempotency, and UI selection persistence. Include regression checks for normalized duplicates, cleared selections, and legacy tag reads for filters and CSV output.",
+            "status": "pending",
+            "testStrategy": "Combine pytest, vitest, and Playwright coverage for migration, API, and UI flows with assertions on persistence coherence.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Decompose into events schema and CRUD APIs, scanned_contacts FK updates, compatibility writes to event_tag, idempotent normalization-based migration, UI selection/clear behavior, and API/UI tests for persistence coherence."
+      },
+      {
+        "id": "21",
+        "title": "Import, export, and release hardening",
+        "description": "Implement import, export, observability, and operational safeguards required to ship safely before the event.",
+        "details": "Add POST /api/contacts/import for Google Contacts CSV with dedup by normalized phone/email, source assignment, and a report of created/ignored/conflicts. Make DuplicateModal compare against imported contacts too. Update CSV export to include products, profiles, event_name, and event_date. Ensure all new backend routes use the timeout-enabled fetch path on the frontend, structured logging, and Sentry breadcrumbs. Add staging and release guardrails: Vercel preview as staging, Railway PR environment with separate DB, pg_dump before migrations, pre-commit blocking main, and documentation for rollback and 10-step smoke testing. Also add IndexedDB version bumps only through db.ts and keep offline cache helpers for taxonomy/materials. Pseudo-code: `import_csv(rows)->dedup_normalized_contacts`; `export_csv(add_new_columns)`; `log_request(route,status,duration,contact_id)`; `guard_admin_routes(X-Admin-Token)`.",
+        "testStrategy": "Add pytest coverage for import dedup/reporting, duplicate detection against imported contacts, and CSV export columns. Add vitest and Playwright smoke tests for scan → save → email in staging, plus checks for timeout-based fetch usage and Sentry breadcrumb emission.",
+        "priority": "high",
+        "dependencies": [
+          "11",
+          "12",
+          "16",
+          "18",
+          "19",
+          "20"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Specify import CSV schema and dedup contract",
+            "description": "Define the Google Contacts CSV contract, row parsing rules, normalized dedup keys, and the import response report shape before implementation starts.",
+            "dependencies": [],
+            "details": "Document accepted CSV headers, required fields, phone/email normalization rules, and conflict semantics. Specify the output payload with created, ignored, and conflicted counts plus per-row details so backend and frontend can rely on one schema.",
+            "status": "pending",
+            "testStrategy": "Review against sample Google Contacts exports and confirm the schema covers missing fields, duplicates, and malformed rows.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Build contacts import endpoint and processing pipeline",
+            "description": "Implement POST /api/contacts/import to ingest Google Contacts CSV rows, deduplicate by normalized phone/email, assign source, and return a detailed processing report.",
+            "dependencies": [
+              1
+            ],
+            "details": "Parse uploaded CSV content server-side, normalize phone and email for matching, and create contacts only when no existing normalized match is found. Record source attribution for imported records and include per-row status for created, ignored, and conflict outcomes.",
+            "status": "pending",
+            "testStrategy": "pytest cases for unique imports, duplicate phone/email matches, malformed rows, and report accuracy.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Extend duplicate detection to imported contacts",
+            "description": "Expand duplicate detection so DuplicateModal compares against imported contacts as well as existing scan-derived contacts.",
+            "dependencies": [
+              2
+            ],
+            "details": "Update duplicate lookup logic and modal data sources to include imported contact records in the comparison set. Ensure normalization matches backend import rules so users see consistent duplicate warnings across scan, manual, and imported records.",
+            "status": "pending",
+            "testStrategy": "UI/unit tests verifying imported contacts appear in duplicate matches and warnings update after import.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Revise CSV export columns and row mapping",
+            "description": "Update CSV export to include the new event and customer context fields required for downstream use.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add products, profiles, event_name, and event_date columns to the export shape while preserving existing fields and ordering expectations. Keep export formatting stable for spreadsheet consumers and ensure values are derived from the structured source of truth.",
+            "status": "pending",
+            "testStrategy": "Snapshot or fixture-based export tests asserting the new columns and representative row values.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Instrument backend routes with structured logging",
+            "description": "Add structured request logging and timing for new backend routes, including contact import and export paths.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Emit consistent logs with route, status, duration, and contact_id where applicable. Standardize backend middleware or helper usage so new endpoints automatically produce machine-readable audit data suitable for debugging and operational monitoring.",
+            "status": "pending",
+            "testStrategy": "Integration tests or log-capture tests confirming expected fields are emitted for success and failure cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Switch frontend flows to timeout fetch and Sentry breadcrumbs",
+            "description": "Adopt the timeout-enabled frontend fetch path for all new backend interactions and wire Sentry breadcrumbs around those operations.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Replace direct fetch usage in the affected UI flows with the timeout-capable wrapper, and add breadcrumb events before and after import, duplicate lookup, and export requests. Ensure breadcrumbs include route context and outcome so failures can be traced in Sentry.",
+            "status": "pending",
+            "testStrategy": "Vitest checks for wrapper usage plus breadcrumb-mocking tests that assert the expected breadcrumb sequence.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add deployment guardrails and rollback documentation",
+            "description": "Implement staging, release, and rollback safeguards so deployment and migration steps are safe before the event.",
+            "dependencies": [
+              5,
+              6
+            ],
+            "details": "Document Vercel preview as staging, Railway PR environment isolation with a separate database, pg_dump before migrations, pre-commit blocking main, and rollback procedures. Include operational notes for environment variables, release approval, and the exact backup/restore expectations.",
+            "status": "pending",
+            "testStrategy": "Checklist-based verification in CI/docs review plus a dry-run confirmation that migration backup steps are described and enforceable.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Write end-to-end smoke tests for release readiness",
+            "description": "Create end-to-end smoke tests covering the critical user path and release-hardening checks before shipping.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "details": "Automate a 10-step smoke flow that validates import, duplicate detection, export, save, and email-related behavior in staging. Add assertions for timeout behavior, logging/breadcrumb side effects, and the presence of offline-cache-safe helpers and IndexedDB versioning rules where applicable.",
+            "status": "pending",
+            "testStrategy": "Playwright and vitest smoke coverage in staging plus targeted assertions for import/export success, duplicate visibility, and operational instrumentation.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 8,
+        "expansionPrompt": "Split into import endpoint and dedup logic, duplicate detection expansion, CSV export changes, observability instrumentation, timeout-enabled frontend fetch adoption, Sentry breadcrumb wiring, environment/release guardrails, and end-to-end smoke tests."
+      },
+      {
+        "id": "22",
+        "title": "chore(frontend): corrigir lint pré-existente",
+        "description": "Corrigir os 4 erros de lint pré-existentes identificados na revisão da branch feature/11-taxonomy-five-products (não corrigidos ali por estarem fora do escopo daquela branch).",
+        "details": "Erros atuais (`npm run lint`), nenhum introduzido por feature/11-taxonomy-five-products:\n\n1. frontend/src/components/ContactPreview.tsx:114 — `react-hooks/set-state-in-effect`: `setForm(...)` chamado direto dentro de um useEffect (hidratação do event_tag salvo em localStorage). Avaliar mover pra state inicial (useState lazy init) em vez de efeito.\n2. frontend/src/components/Scanner.tsx:100 — `@typescript-eslint/no-explicit-any`: tipar o valor (provavelmente resultado de lib de captura/QR) em vez de `any`.\n3. frontend/src/components/Scanner.tsx:151 — `@typescript-eslint/no-explicit-any`: mesmo caso, outro ponto do arquivo.\n4. frontend/src/components/contact/ObservacaoAudio.tsx:18 — `react-hooks/set-state-in-effect`: `setElapsed(0)` chamado direto dentro de useEffect quando `active` vira false.\n\nRodar `cd frontend && npm run lint` antes e depois pra confirmar que zera os 4 erros sem introduzir novos, e que os componentes afetados (preview de contato, scanner de cartão/QR, observação por áudio) continuam funcionando (cobrir com teste manual ou vitest onde fizer sentido).",
+        "testStrategy": "npm run lint sem erros nesses 3 arquivos; smoke manual do fluxo de scan/preview e da gravação de observação por áudio.",
+        "priority": "low",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-08-24T18:41:35.205Z",
+      "taskCount": 12,
+      "completedCount": 1,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { QrCode, Cloud, CloudOff, Mail, MailCheck, AlertCircle, Star } from 'lucide-react';
-import { ContactRecord, tagsToClassificacoes } from '@/lib/types';
+import { ContactRecord } from '@/lib/types';
+import { tagsToClassificacoes } from '@/lib/taxonomy';
 import { getContactImageUrl } from '@/lib/api';
 import { ClassificationChip, ClassificationChipData } from './ClassificationChip';
 import { useState } from 'react';

@@ -130,8 +130,8 @@ export function HomeScreen({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Saves que falharam por rede, aguardando reenvio automático */}
-        <PendingSavesBanner onFlushed={onSavesFlushed} />
+        {/* Saves que falharam por rede (ou precisam de revisão por 422) */}
+        <PendingSavesBanner onFlushed={onSavesFlushed} onOpenContact={onSelectContact} />
 
         {/* Capture modes */}
         <Section title="Escaneie um contato">
