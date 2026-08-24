@@ -1,46 +1,30 @@
-export const ALLOWED_TAGS = [
-  "Patrocínio",
-  "Instrutor",
-  "Parceria",
-  "Cliente",
-  "Mídia",
-  "Follow-up",
-] as const;
+import rawTaxonomy from "./taxonomy.json";
 
-export type AllowedTag = (typeof ALLOWED_TAGS)[number];
+export const ALLOWED_TAGS: string[] = rawTaxonomy.interest_types;
 
 export type Importance = 1 | 2 | 3 | null;
 
 export type EmailLanguage = "pt-BR" | "en" | "es";
 
-export type SubtipoInvest = "parceria" | "venda";
-export type Subtipo360 = "stand" | "patrocinio";
-export type ClassificacaoTag =
-  | `cimi_invest:${SubtipoInvest}`
-  | `cimi_360:${Subtipo360}`;
+/** Estado de classificação: { product_key: slug | null } */
+export type ClassificacaoState = Record<string, string | null>;
 
-export type ClassificacaoState = {
-  cimi_invest: SubtipoInvest | null;
-  cimi_360: Subtipo360 | null;
-};
-
-export function classificacoesToTags(c: ClassificacaoState): ClassificacaoTag[] {
-  const tags: ClassificacaoTag[] = [];
-  if (c.cimi_invest) tags.push(`cimi_invest:${c.cimi_invest}`);
-  if (c.cimi_360) tags.push(`cimi_360:${c.cimi_360}`);
+export function classificacoesToTags(state: ClassificacaoState): string[] {
+  const tags: string[] = [];
+  for (const [key, slug] of Object.entries(state)) {
+    if (slug) tags.push(`${key}:${slug}`);
+  }
   return tags;
 }
 
 export function tagsToClassificacoes(tags: string[]): ClassificacaoState {
-  const state: ClassificacaoState = { cimi_invest: null, cimi_360: null };
+  const state: ClassificacaoState = {};
   for (const tag of tags) {
-    if (tag.startsWith("cimi_invest:")) {
-      const sub = tag.slice("cimi_invest:".length) as SubtipoInvest;
-      if (sub === "parceria" || sub === "venda") state.cimi_invest = sub;
-    } else if (tag.startsWith("cimi_360:")) {
-      const sub = tag.slice("cimi_360:".length) as Subtipo360;
-      if (sub === "stand" || sub === "patrocinio") state.cimi_360 = sub;
-    }
+    const idx = tag.indexOf(":");
+    if (idx === -1) continue;
+    const key = tag.slice(0, idx);
+    const slug = tag.slice(idx + 1);
+    state[key] = slug;
   }
   return state;
 }
@@ -128,4 +112,16 @@ export interface BatchResultItem {
 
 export interface BatchScanResponse {
   results: BatchResultItem[];
+}
+
+/** Verifica se uma tag é de interesse (não é classificação de produto). */
+export function isInterestTag(tag: string): boolean {
+  const idx = tag.indexOf(":");
+  if (idx === -1) return true;
+  const key = tag.slice(0, idx);
+  const knownProducts = new Set([
+    ...rawTaxonomy.products.map((p: { key: string }) => p.key),
+    ...Object.keys(rawTaxonomy.legacy_profiles || {}),
+  ]);
+  return !knownProducts.has(key);
 }

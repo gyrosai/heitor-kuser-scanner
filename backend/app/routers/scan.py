@@ -18,7 +18,6 @@ from app.database import async_session, get_db
 from app.db_models import ScannedContact
 from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
 from app.models import (
-    ALLOWED_TAGS,
     BatchImageItem,
     BatchResultItem,
     BatchScanRequest,
@@ -29,11 +28,24 @@ from app.models import (
     SendEmailRequest,
     SendEmailResponse,
 )
+from app.taxonomy import format_csv_columns, get_taxonomy_payload, parse_classification_tags
 from app.services import image_service, ocr_service, qrcode_service, vcard_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
+
+
+@router.get("/taxonomy")
+async def get_taxonomy():
+    """Retorna a taxonomia canônica de produtos, perfis e tipos de interesse."""
+    from fastapi.responses import JSONResponse
+
+    payload = get_taxonomy_payload()
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 def _contact_to_dict(c: ScannedContact, include_image_flag: bool = True) -> dict:
@@ -601,12 +613,16 @@ async def export_contacts_csv(
             "Evento",
             "Data",
             "Tem Foto",
+            "Produtos",
+            "Perfis",
         ]
     )
     for row in rows:
         c = row[0]
         has_image = bool(row[1])
         importance_str = "⭐" * c.importance if c.importance else ""
+        classifications = parse_classification_tags(list(c.tags or []))
+        produtos_str, perfis_str = format_csv_columns(classifications)
         writer.writerow(
             [
                 c.name or "",
@@ -621,6 +637,8 @@ async def export_contacts_csv(
                 c.event_tag or "",
                 c.scanned_at.isoformat() if c.scanned_at else "",
                 "Sim" if has_image else "Não",
+                produtos_str,
+                perfis_str,
             ]
         )
 

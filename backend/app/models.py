@@ -1,33 +1,34 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.taxonomy import ALLOWED_TAGS_SET, INTEREST_TYPES, is_valid_classification
+
 # ── Tipos compartilhados ──────────────────────────────────────────────────────
 EmailStatus = Literal["sent", "failed", "queued", "skipped"]
 Language = Literal["pt-BR", "en", "es"]
 
-ALLOWED_TAGS = ["Patrocínio", "Palestrante", "Parceria", "Cliente", "Mídia", "Follow-up"]
+logger = logging.getLogger(__name__)
 
-# Classificação CIMI — valores válidos para tags com convenção tipo:subtipo
-_CLASSIFICATION_VALID: dict[str, set[str]] = {
-    "cimi_invest": {"parceria", "venda"},
-    "cimi_360": {"stand", "patrocinio"},
-}
+# Compatibilidade: ALLOWED_TAGS é o nome antigo usado em vários imports
+ALLOWED_TAGS = list(INTEREST_TYPES)
 
 
 def _is_valid_tag(tag: str) -> bool:
+    """Validação rápida (True/False) usada por leituras e CSV.
+
+    Não levanta exceção — retorna False para qualquer tag inválida.
+    """
     if not isinstance(tag, str):
         return False
-    if tag in ALLOWED_TAGS:
+    if tag in ALLOWED_TAGS_SET:
         return True
-    if ":" in tag:
-        tipo, _, subtipo = tag.partition(":")
-        valid_subtipos = _CLASSIFICATION_VALID.get(tipo)
-        return valid_subtipos is not None and subtipo in valid_subtipos
-    return False
+    ok, _ = is_valid_classification(tag)
+    return ok
 
 
 class ContactData(BaseModel):
@@ -64,7 +65,24 @@ class ContactData(BaseModel):
             return []
         if not isinstance(v, list):
             return []
-        return [t for t in v if _is_valid_tag(t)]
+        valid: list[str] = []
+        dropped: list[str] = []
+        for t in v:
+            if t in ALLOWED_TAGS_SET:
+                valid.append(t)
+                continue
+            if ":" in t:
+                ok, reason = is_valid_classification(t)
+                if ok:
+                    valid.append(t)
+                else:
+                    # classificação inválida → 422 (ValueError é convertido por Pydantic)
+                    raise ValueError(reason or f"classificação inválida: {t}")
+            else:
+                dropped.append(t)
+        if dropped:
+            logger.warning("Tags de interesse desconhecidas removidas: %s", dropped)
+        return valid
 
 
 class ScanRequest(BaseModel):

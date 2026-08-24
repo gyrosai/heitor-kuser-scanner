@@ -25,6 +25,7 @@ import ClassificacaoSection from "./contact/ClassificacaoSection";
 import {
   type ClassificacaoState,
   classificacoesToTags,
+  isInterestTag,
   tagsToClassificacoes,
 } from "@/lib/types";
 
@@ -215,9 +216,7 @@ export default function ReviewCarousel({
 
     setSaving(true);
     const classificationTags = classificacoesToTags(current.classificacao);
-    const interestTags = (current.form.tags ?? []).filter(
-      (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
-    );
+    const interestTags = (current.form.tags ?? []).filter(isInterestTag);
     const payload: ContactData = {
       ...current.form,
       name: current.form.name.trim(),
@@ -493,9 +492,7 @@ export default function ReviewCarousel({
             Tipo de interesse
           </label>
           <TagChips
-            value={(current.form.tags ?? []).filter(
-              (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
-            )}
+            value={(current.form.tags ?? []).filter(isInterestTag)}
             onChange={(tags) => updateForm("tags", tags)}
           />
         </div>

@@ -8,6 +8,7 @@ import {
   EmailLanguage,
   Importance,
   classificacoesToTags,
+  isInterestTag,
   tagsToClassificacoes,
 } from "@/lib/types";
 import { useToast } from "@/components/Toast";
@@ -32,7 +33,7 @@ const LEGACY_EVENT_KEY = "heitor_scanner_last_event_tag";
 export const LAST_EVENT_KEY = "cimi_leads_last_event_tag";
 
 function isClassificationTag(tag: string) {
-  return tag.startsWith("cimi_invest:") || tag.startsWith("cimi_360:");
+  return !isInterestTag(tag);
 }
 
 function countNonEmptyFields(contact: ContactData): number {

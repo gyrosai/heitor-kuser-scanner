@@ -54,6 +54,7 @@ export function Radio({
 interface RadioGroupOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 interface RadioGroupProps {
@@ -67,7 +68,7 @@ interface RadioGroupProps {
 
 export function RadioGroup({ name: _name, value, onChange, options, color, disabled }: RadioGroupProps) {
   return (
-    <div role="radiogroup" className="flex flex-row gap-4">
+    <div role="radiogroup" className="flex flex-row flex-wrap gap-4">
       {options.map((opt) => (
         <Radio
           key={opt.value}
@@ -76,7 +77,7 @@ export function RadioGroup({ name: _name, value, onChange, options, color, disab
           onChange={onChange}
           label={opt.label}
           color={color}
-          disabled={disabled}
+          disabled={disabled || opt.disabled}
         />
       ))}
     </div>

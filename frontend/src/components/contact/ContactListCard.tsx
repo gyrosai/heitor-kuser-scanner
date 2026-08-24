@@ -15,15 +15,14 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
-
 function getChips(tags: string[]): ClassificationChipData[] {
   const cls = tagsToClassificacoes(tags);
   const chips: ClassificationChipData[] = [];
-  if (cls.cimi_invest) chips.push({ type: 'invest', sub: capitalize(cls.cimi_invest) });
-  if (cls.cimi_360) chips.push({ type: 'cimi360', sub: capitalize(cls.cimi_360) });
+  for (const [key, slug] of Object.entries(cls)) {
+    if (slug) {
+      chips.push({ productKey: key, slug });
+    }
+  }
   return chips;
 }
 
