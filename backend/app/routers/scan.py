@@ -18,7 +18,6 @@ from app.database import async_session, get_db
 from app.db_models import ScannedContact
 from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
 from app.models import (
-    ALLOWED_TAGS,
     BatchImageItem,
     BatchResultItem,
     BatchScanRequest,
@@ -29,11 +28,24 @@ from app.models import (
     SendEmailRequest,
     SendEmailResponse,
 )
+from app.taxonomy import format_csv_columns, get_taxonomy_payload, parse_classification_tags
 from app.services import image_service, ocr_service, qrcode_service, vcard_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
+
+
+@router.get("/taxonomy")
+async def get_taxonomy():
+    """Retorna a taxonomia canônica de produtos, perfis e tipos de interesse."""
+    from fastapi.responses import JSONResponse
+
+    payload = get_taxonomy_payload()
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 def _contact_to_dict(c: ScannedContact, include_image_flag: bool = True) -> dict:
@@ -596,17 +608,24 @@ async def export_contacts_csv(
             "Email",
             "Website",
             "Importância",
-            "Tags",
             "Observações",
             "Evento",
             "Data",
             "Tem Foto",
+            "Produtos",
+            "Perfis",
+            "Tags",
         ]
     )
     for row in rows:
         c = row[0]
         has_image = bool(row[1])
         importance_str = "⭐" * c.importance if c.importance else ""
+        all_tags = list(c.tags or [])
+        classifications = parse_classification_tags(all_tags)
+        produtos_str, perfis_str = format_csv_columns(classifications)
+        # Tags de interesse brutas (sem ":") — classificação já vai em Produtos/Perfis.
+        interest_tags_str = "; ".join(t for t in all_tags if ":" not in t)
         writer.writerow(
             [
                 c.name or "",
@@ -616,11 +635,13 @@ async def export_contacts_csv(
                 c.email or "",
                 c.website or "",
                 importance_str,
-                "; ".join(c.tags or []),
                 c.notes or "",
                 c.event_tag or "",
                 c.scanned_at.isoformat() if c.scanned_at else "",
                 "Sim" if has_image else "Não",
+                produtos_str,
+                perfis_str,
+                interest_tags_str,
             ]
         )
 
@@ -818,8 +839,9 @@ async def delete_contact(
 
 
 def _smart_merge(existing: ScannedContact, new: ContactData) -> dict:
-    """Merge inteligente: vazio → pega novo; tags → união; importance → max;
-    notes → append timestamped; card_image → mantém existing."""
+    """Merge inteligente: vazio → pega novo; tags de interesse → união;
+    classificação (produto:perfil) → novo perfil substitui o do mesmo produto;
+    importance → max; notes → append timestamped; card_image → mantém existing."""
     def empty(v):
         return v is None or (isinstance(v, str) and v.strip() == "")
 
@@ -831,7 +853,24 @@ def _smart_merge(existing: ScannedContact, new: ContactData) -> dict:
 
     existing_tags = set(existing.tags or [])
     new_tags = set(new.tags or [])
-    merged["tags"] = sorted(existing_tags | new_tags)
+
+    def _classification_product(tag: str) -> str | None:
+        """product_key de uma tag "<product>:<slug>"; None se for tag de interesse."""
+        return tag.partition(":")[0] if ":" in tag else None
+
+    # Tags de classificação (produto:perfil): se o payload novo traz um perfil
+    # pra um produto, o novo substitui QUALQUER perfil existente do mesmo
+    # produto (não faz união — um contato só pode ter um perfil por produto).
+    # Tags de interesse (sem ":") continuam em união normalmente.
+    new_classified_products = {
+        p for t in new_tags if (p := _classification_product(t)) is not None
+    }
+    kept_existing_tags = {
+        t
+        for t in existing_tags
+        if _classification_product(t) not in new_classified_products
+    }
+    merged["tags"] = sorted(kept_existing_tags | new_tags)
 
     existing_imp = existing.importance or 0
     new_imp = new.importance or 0

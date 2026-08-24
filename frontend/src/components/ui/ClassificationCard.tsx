@@ -11,6 +11,8 @@ interface ClassificationCardProps {
   selected: string;
   onSelect: (option: string) => void;
   disabled?: boolean;
+  optionLabel?: (value: string) => string;
+  disabledOption?: (value: string) => boolean;
 }
 
 export function ClassificationCard({
@@ -22,8 +24,14 @@ export function ClassificationCard({
   selected,
   onSelect,
   disabled,
+  optionLabel,
+  disabledOption,
 }: ClassificationCardProps) {
-  const radioOptions = options.map((o) => ({ value: o.toLowerCase(), label: o }));
+  const radioOptions = options.map((o) => ({
+    value: o,
+    label: optionLabel ? optionLabel(o) : o,
+    disabled: disabledOption ? disabledOption(o) : false,
+  }));
 
   return (
     <div

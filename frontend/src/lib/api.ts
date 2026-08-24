@@ -121,6 +121,29 @@ function parseRetryAfter(res: Response): number | undefined {
   return undefined;
 }
 
+/**
+ * Extrai uma mensagem legível do "detail" de uma resposta de erro.
+ *
+ * - string: usa direto (ex: HTTPException(detail="...")).
+ * - array (formato padrão de erro de validação do FastAPI/Pydantic em 422):
+ *   junta os "msg" de cada item, removendo o prefixo "Value error, " que o
+ *   Pydantic v2 adiciona a exceções levantadas via @field_validator.
+ * - qualquer outra coisa: mensagem genérica com o status.
+ */
+function extractErrorMessage(detail: unknown, status: number): string {
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const messages = detail
+      .map((item) => {
+        const raw = (item as { msg?: unknown } | null)?.msg;
+        return typeof raw === "string" ? raw.replace(/^Value error,\s*/, "") : null;
+      })
+      .filter((m): m is string => !!m);
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return `Erro ${status}`;
+}
+
 // Converte resposta não-ok em NetworkError (retriável) ou ApiError (lógico)
 async function throwClassified(res: Response): Promise<never> {
   let detail: unknown = null;
@@ -134,8 +157,7 @@ async function throwClassified(res: Response): Promise<never> {
       detail = null;
     }
   }
-  const msg =
-    typeof detail === "string" && detail ? detail : `Erro ${res.status}`;
+  const msg = extractErrorMessage(detail, res.status);
 
   if (res.status >= 500 || res.status === 408 || res.status === 429) {
     throw new NetworkError(msg, {

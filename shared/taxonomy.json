@@ -1,0 +1,86 @@
+{
+  "products": [
+    {
+      "key": "cimi_360",
+      "label": "CIMI 360",
+      "profiles": [
+        {"slug": "stand", "label": "Stand"},
+        {"slug": "patrocinio", "label": "Patrocínio"}
+      ]
+    },
+    {
+      "key": "cimi_invest",
+      "label": "CIMI Invest",
+      "profiles": [
+        {"slug": "empreendedor", "label": "Empreendedor"},
+        {"slug": "investidor", "label": "Investidor"},
+        {"slug": "comprador", "label": "Comprador"},
+        {"slug": "corretor_de_imoveis", "label": "Corretor de Imóveis"},
+        {"slug": "imobiliaria", "label": "Imobiliária"},
+        {"slug": "t_e_i", "label": "T&I"},
+        {"slug": "parceiro", "label": "Parceiro"},
+        {"slug": "associacao", "label": "Associação"}
+      ]
+    },
+    {
+      "key": "leilao",
+      "label": "Leilão",
+      "profiles": [
+        {"slug": "comprador", "label": "Comprador"},
+        {"slug": "vendedor", "label": "Vendedor"},
+        {"slug": "municipio", "label": "Município"},
+        {"slug": "estado", "label": "Estado"},
+        {"slug": "cliente", "label": "Cliente"},
+        {"slug": "operador", "label": "Operador"},
+        {"slug": "parceiro", "label": "Parceiro"},
+        {"slug": "consorcio", "label": "Consórcio"}
+      ]
+    },
+    {
+      "key": "indip",
+      "label": "INDIP",
+      "profiles": [
+        {"slug": "municipio", "label": "Município"},
+        {"slug": "estado", "label": "Estado"},
+        {"slug": "cliente", "label": "Cliente"},
+        {"slug": "operador", "label": "Operador"},
+        {"slug": "parceiro", "label": "Parceiro"},
+        {"slug": "consorcio", "label": "Consórcio"}
+      ]
+    },
+    {
+      "key": "feirao",
+      "label": "Feirão dos Corretores",
+      "profiles": [
+        {"slug": "incorporadora_nacional", "label": "Incorporadora Nacional"},
+        {"slug": "incorporadora_internacional", "label": "Incorporadora Internacional"},
+        {"slug": "comprador", "label": "Comprador"},
+        {"slug": "corretor_de_imoveis", "label": "Corretor de Imóveis"},
+        {"slug": "imobiliaria", "label": "Imobiliária"},
+        {"slug": "t_e_i", "label": "T&I"},
+        {"slug": "parceiro", "label": "Parceiro"},
+        {"slug": "associacao", "label": "Associação"}
+      ]
+    }
+  ],
+  "legacy_profiles": {
+    "cimi_invest": [
+      {"slug": "parceria", "label": "Parceria"},
+      {"slug": "venda", "label": "Venda"}
+    ]
+  },
+  "interest_types": [
+    "Patrocínio",
+    "Instrutor",
+    "Palestrante",
+    "Parceria",
+    "Cliente",
+    "Mídia",
+    "Follow-up",
+    "Associação",
+    "Município",
+    "Estado",
+    "União",
+    "Órgão Federal"
+  ]
+}

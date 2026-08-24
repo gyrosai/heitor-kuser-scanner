@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
+  ALLOWED_TAGS,
   ClassificacaoState,
   ContactData,
   ContactRecord,
   EmailLanguage,
-  classificacoesToTags,
-  tagsToClassificacoes,
+  isInterestTag,
 } from "@/lib/types";
-import { ALLOWED_TAGS } from "@/lib/types";
+import { classificacoesToTags, tagsToClassificacoes } from "@/lib/taxonomy";
 import {
   deleteContact,
   getContact,
@@ -111,10 +111,7 @@ export default function ContactEditor({
   const { online } = useNetworkStatus();
   const [original, setOriginal] = useState<ContactRecord | null>(null);
   const [form, setForm] = useState<ContactData | null>(null);
-  const [classificacao, setClassificacao] = useState<ClassificacaoState>({
-    cimi_invest: null,
-    cimi_360: null,
-  });
+  const [classificacao, setClassificacao] = useState<ClassificacaoState>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -143,9 +140,7 @@ export default function ContactEditor({
           source: rec.source,
           event_tag: rec.event_tag,
           importance: rec.importance,
-          tags: (rec.tags ?? []).filter(
-            (t) => !t.startsWith("cimi_invest:") && !t.startsWith("cimi_360:"),
-          ),
+          tags: (rec.tags ?? []).filter(isInterestTag),
           email_language: rec.email_language ?? "pt-BR",
         });
         setSelectedLanguage(rec.email_language ?? "pt-BR");

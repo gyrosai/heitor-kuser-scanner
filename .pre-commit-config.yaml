@@ -1,0 +1,19 @@
+repos:
+  # Bloqueia commit direto na main — dev-workflow.md exige branch por tarefa.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  # Garante que shared/taxonomy.json (fonte editável) está sincronizado com
+  # as cópias reais consumidas pelo frontend e pelo backend.
+  - repo: local
+    hooks:
+      - id: check-taxonomy-sync
+        name: check-taxonomy-sync
+        description: "Falha se shared/taxonomy.json divergir das cópias em frontend/backend"
+        entry: python3 scripts/check_taxonomy_sync.py
+        language: system
+        pass_filenames: false
+        files: 'taxonomy\.json$|^scripts/(sync|check)_taxonomy\.py$'

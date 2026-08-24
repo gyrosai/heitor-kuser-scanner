@@ -169,7 +169,28 @@ async function handleFailure(
     return "abort";
   }
 
-  // Erro lógico (4xx ≠ 409/401): retry não resolve — remove da fila e
+  // 422 (validação): dado inválido, não é falha de rede — mas descartar o
+  // contato seria pior que deixar pendente. Mantém na fila marcado como
+  // needs_review; o flush automático passa a ignorá-lo (ver flushSaveQueue)
+  // e o banner de pendências oferece abrir no editor pra corrigir.
+  if (err instanceof ApiError && err.status === 422) {
+    await updatePendingSave(item.id, {
+      last_attempt_at: Date.now(),
+      last_error: err.message,
+      needs_review: true,
+    });
+    Sentry.captureMessage("save_queue: item precisa de revisão (422)", {
+      level: "warning",
+      extra: {
+        id: item.id,
+        contact_id: item.contact_id,
+        last_error: err.message,
+      },
+    });
+    return "failed";
+  }
+
+  // Erro lógico (4xx ≠ 409/401/422): retry não resolve — remove da fila e
   // registra no Sentry (precisamos saber que um contato foi descartado).
   Sentry.captureException(err, {
     level: "error",

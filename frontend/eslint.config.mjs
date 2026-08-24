@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Pasta de mockups/protótipos (.jsx soltos, não fazem parte do app buildado).
+    "_design/**",
   ]),
 ]);
 
