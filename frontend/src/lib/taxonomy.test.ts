@@ -85,8 +85,12 @@ describe("taxonomy helpers", () => {
   it("getAllowedTags includes interest types", () => {
     const tags = getAllowedTags(TAXONOMY);
     expect(tags).toContain("Instrutor");
-    expect(tags).toContain("Palestrante");
     expect(tags).toContain("Associação");
+  });
+
+  it("getAllowedTags does not include Palestrante", () => {
+    const tags = getAllowedTags(TAXONOMY);
+    expect(tags).not.toContain("Palestrante");
   });
 
   it("formatCsvColumns builds produtos and perfis strings", () => {

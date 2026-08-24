@@ -17,7 +17,6 @@ from app.taxonomy import (
     get_product_label,
     get_profile_label,
     get_taxonomy_payload,
-    is_valid_classification,
     parse_classification_tags,
 )
 
@@ -31,13 +30,15 @@ class TestTaxonomyStructure:
 
     def test_interest_types_includes_new_and_old(self):
         assert "Instrutor" in INTEREST_TYPES
-        assert "Palestrante" in INTEREST_TYPES
         assert "Associação" in INTEREST_TYPES
         assert "Município" in INTEREST_TYPES
 
     def test_allowed_tags_set(self):
         assert "Instrutor" in ALLOWED_TAGS_SET
-        assert "Palestrante" in ALLOWED_TAGS_SET
+
+    def test_palestrante_removed_from_vocabulary(self):
+        assert "Palestrante" not in INTEREST_TYPES
+        assert "Palestrante" not in ALLOWED_TAGS_SET
 
     def test_legacy_profiles_present(self):
         payload = get_taxonomy_payload()
@@ -119,9 +120,17 @@ class TestValidation:
         assert "perfildoido" in str(exc_info.value)
 
     def test_interest_type_accepted(self):
-        c = ContactData(name="Test", tags=["Instrutor", "Palestrante", "Patrocínio"])
+        c = ContactData(name="Test", tags=["Instrutor", "Patrocínio"])
         assert "Instrutor" in c.tags
-        assert "Palestrante" in c.tags
+        assert "Patrocínio" in c.tags
+
+    def test_palestrante_filtered_with_warning(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="app.models"):
+            c = ContactData(name="Test", tags=["Palestrante"])
+        assert c.tags == []
+        assert "Palestrante" in caplog.text
 
 
 class TestHelpers:
