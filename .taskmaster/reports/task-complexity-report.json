@@ -1,0 +1,101 @@
+{
+	"meta": {
+		"generatedAt": "2026-08-24T17:22:19.061Z",
+		"tasksAnalyzed": 11,
+		"totalTasks": 11,
+		"analysisCount": 11,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 11,
+			"taskTitle": "Backend taxonomy source of truth",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down the work into: define immutable taxonomy constants and derived allowed tags, implement the /api/taxonomy endpoint, wire validators to use the shared allowlist, handle legacy CIMI Invest read/validate exceptions, and add backend tests for ordering and validation.",
+			"reasoning": "This is mostly a centralized refactor with a new read-only endpoint and shared validation source. The main risk is consistency across backend consumers and preserving legacy behavior, but there are few moving parts and no data migration."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Classification storage migration",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Split the migration into schema assessment, migration design, additive schema changes, idempotent data backfill/conversion, legacy compatibility handling for reads and CSV, and validation/regression tests for accepted and rejected values.",
+			"reasoning": "This task touches persistence, schema evolution, data backfill, and backward compatibility. The need to preserve historical data while possibly changing the model to jsonb adds moderate technical risk and careful testing requirements."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Frontend classification UI expansion",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Decompose into API client updates for taxonomy fetching/caching, editor component refactor, batch review carousel updates, history view compatibility, legacy CIMI Invest label rendering, and UI tests for ordering and persistence.",
+			"reasoning": "The frontend work is broad but conceptually straightforward: consume backend taxonomy and propagate state across several views. Complexity comes from avoiding hardcoded lists and preserving legacy display behavior in multiple interaction paths."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Health endpoint with Google token status",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Expand into backend token inspection logic, health response enrichment, logging/safety review, frontend status indicator implementation, and tests for all token states.",
+			"reasoning": "This is a small feature with limited surface area: one endpoint enhancement plus a lightweight UI indicator. The main considerations are safe token inspection and keeping the endpoint fast and secret-free."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Shared package composition service",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break the service into template rendering/placeholder replacement, material filtering rules, package assembly/output formatting, legacy media-kit fallback behavior, and unit/regression tests for different language/product combinations.",
+			"reasoning": "A shared composition service affects downstream email and future WhatsApp flows, so correctness and extensibility matter. Placeholder cleanup and filtering rules introduce edge cases, but the service is still a contained backend module."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Materials storage and admin APIs",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Split into schema design and migration, CSV import parser, idempotent upsert logic, admin authentication enforcement, CRUD/list/reorder API endpoints, inactive-item rules, and tests for import/update conflicts.",
+			"reasoning": "This combines database design, file import, authorization, and multiple admin operations. Idempotency and uniqueness constraints are the hardest parts, especially with CSV variability and preserving stable ordering."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Materials admin interface",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Decompose into page scaffolding, grouped materials data loading, edit/toggle/reorder controls, admin-authenticated API integration, shared cached client usage, and UI/integration tests.",
+			"reasoning": "The UI is moderately complex because it needs structured grouping, editing, and ordering interactions, but it relies on the backend APIs already defined. The main effort is in responsive admin UX without adding unnecessary weight."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Email package selection and preview UI",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break the feature into product selector state, auto-selection rules, material checklist defaults, live preview rendering via the shared package service, legacy fallback behavior, resend flow integration, and component/regression tests.",
+			"reasoning": "This is a core user-facing workflow with several conditional paths and strong coupling to shared composition logic. It must handle product selection, language defaults, legacy behavior, and resend scenarios consistently."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Email send pipeline and send history",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Split into send-pipeline contract changes, sent_materials schema and persistence, message composition integration, resend support, missing-email disablement, legacy fixed-path compatibility, and backend/SMTP tests with history assertions.",
+			"reasoning": "This is a high-risk workflow because it changes the actual send path, adds durable audit history, and must remain compatible with existing email behavior. Reliability, rollback safety, and replayability all increase complexity."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Structured events and event migration",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Decompose into events schema and CRUD APIs, scanned_contacts FK updates, compatibility writes to event_tag, idempotent normalization-based migration, UI selection/clear behavior, and API/UI tests for persistence coherence.",
+			"reasoning": "This spans schema changes, migration of free-text data, compatibility constraints, and frontend state management. The normalization and idempotency requirements make the migration particularly sensitive."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Import, export, and release hardening",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Split into import endpoint and dedup logic, duplicate detection expansion, CSV export changes, observability instrumentation, timeout-enabled frontend fetch adoption, Sentry breadcrumb wiring, environment/release guardrails, and end-to-end smoke tests.",
+			"reasoning": "This is the broadest task and functions as a release-hardening umbrella across multiple subsystems. It combines new data ingestion, export shape changes, observability, deployment safeguards, and cross-cutting frontend/backend quality work."
+		}
+	]
+}
