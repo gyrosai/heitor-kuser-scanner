@@ -1,0 +1,323 @@
+# PRD - CIMI Leads v2 (Classificação e Envio de Materiais por E-mail)
+
+Salvar em: .taskmaster/docs/prd.txt
+Data: 24/08/2026
+Autora: Camila Martins (CIMI360 / GYROSAI)
+
+## 1. Contexto
+
+CIMI Leads é um PWA que escaneia cartões de visita em eventos, extrai dados via OCR
+(GPT-4o Vision), permite ao operador enriquecer o lead (importância 1-3, tags, observações,
+foto do cartão) e grava na base de leads (PostgreSQL no Railway — sistema de verdade),
+sincronizando para uma conta Google central via People API e exportando CSV.
+
+Stack: FastAPI + SQLAlchemy async no Railway (backend + Postgres) · Next.js + Tailwind na
+Vercel (PWA, sem service worker, rewrites proxeiam /api/* para o Railway) · IndexedDB v2 via
+db.ts para modo offline e fila de retry · Google People API (OAuth single-account) · Gmail SMTP
+para e-mail de mídia kit · Sentry (org gyros-ki, projeto cimi-leads). Versão atual 0.3.1.
+Em produção: PRs 1-4 (CRM-lite, editor, batch offline, rebrand), e-mail de mídia kit pós-save,
+e as versões 0.3.0/0.3.1 de resiliência (timeouts em todo fetch, classificação de erro, fila
+de retry offline, banner de pendências, listagem com status de sync/e-mail).
+
+O app é SINGLE-TENANT por decisão de produto: todos os operadores gravam na mesma conta
+Google central. Não implementar multi-tenant.
+
+Após uso em campo, Heitor Kuser (CEO) e Henrique Fetz (operador) pediram uma nova rodada de
+funcionalidades. Há um evento em poucos dias; não haverá tempo para corrigir bugs em campo.
+Por isso este PRD separa o escopo em P0 (obrigatório antes do evento), P1 (logo após) e P2.
+
+O bug crítico do evento de 14/08 (save travava sem erro) foi resolvido em 24/08: causa raiz
+era fetch sem timeout em rede zumbi. Os drafts reais foram promovidos (361, 363, 365).
+O app OAuth foi publicado em Production em 24/08 (tokens deixam de expirar em 7 dias);
+verificação formal fica para depois do evento.
+
+O editor de contato JÁ possui classificação por produto com perfil único (radio):
+CIMI Invest (Parceria, Venda) e CIMI 360 (Stand, Patrocínio). A taxonomia nova ESTENDE
+essa estrutura. O evento é o CIMI360, em 27 e 28/08/2026 — restam dois dias úteis de
+desenvolvimento e o deploy final deve acontecer até 26/08 ao meio-dia.
+
+## 2. Objetivo
+
+Chegar ao evento com o app estável (zero regressões no fluxo escanear → salvar → Google) e
+com o operador conseguindo, em menos de 60 segundos por lead: classificar o contato por
+produto/perfil e enviar por E-MAIL um pacote de materiais adequado ao produto, com texto
+padrão, reutilizando o pipeline de e-mail de mídia kit que já existe. WhatsApp (wa.me) é
+um canal adicional, só se sobrar tempo.
+
+## 3. Usuário-alvo
+
+- Henrique Fetz (operador de campo): escaneia dezenas de cartões por dia em feiras e
+  missões comerciais (MIPIM, SIL, Expo Real, etc.). Precisa de fluxo rápido, com o mínimo de
+  digitação, funcionando em Android com rede instável.
+- Heitor Kuser (CEO): recebe os contatos no Google Contacts do celular, quer os leads
+  classificados por vertical de negócio (CIMI360, CIMI Invest, INDIP, Leilão, Feirão) e quer
+  que sua base histórica de contatos apareça no app para evitar duplicidade.
+- Camila (dev/PO): precisa entregar sem bugs, com testes e trilha de deploy segura.
+
+Cenário real: Henrique conhece um investidor no MIPIM. Escaneia o cartão, marca "CIMI Invest
+→ Investidor", importância 3, evento "CIMI360 2026". Marca "Enviar materiais ao salvar",
+escolhe CIMI Invest, idioma EN, e os itens Sobre + Flyer + MOU (ENG) já vêm marcados. Salva.
+O contato vai para o Postgres e o Google Contacts do Heitor, e o e-mail com o texto padrão e
+os links sai pelo mesmo pipeline do mídia kit, com status visível no histórico.
+
+## 4. Escopo (nesta versão)
+
+### P0 — antes do evento (deploy final até 26/08 12h; ordem obrigatória)
+- Fase 0 (mínima): reconectar a conta Google central após a publicação em Production e
+  validar save + Google Contacts; smoke da v0.3.1 no Android do Heitor.
+- Fase 1 (mínima): pre-commit bloqueando main; testes unitários apenas dos módulos novos;
+  Vercel preview do PR como staging de frontend; pg_dump antes de cada migration.
+- Taxonomia: estender a classificação existente. Produtos e perfis finais:
+  CIMI 360 (Stand, Patrocínio — já existem) · CIMI Invest (Empreendedor, Investidor,
+  Comprador, Corretor de Imóveis, Imobiliária, T&I, Parceiro, Associação — SUBSTITUI
+  Parceria/Venda) · Leilão (Comprador, Vendedor, Município, Estado, Cliente, Operador,
+  Parceiro, Consórcio) · INDIP (Município, Estado, Cliente, Operador, Parceiro, Consórcio)
+  · Feirão dos Corretores (Incorporadora Nacional, Incorporadora Internacional, Comprador,
+  Corretor de Imóveis, Imobiliária, T&I, Parceiro, Associação). Novos tipos de interesse
+  (Associação, Município, Estado, União, Órgão Federal) somados aos existentes, se a lista
+  de interesses ainda existir no editor. Fonte única no backend, endpoint /api/taxonomy.
+- Biblioteca de materiais (somente links externos): tabela + importação por CSV (o CSV
+  preenchido pelo Henrique É a tela de administração desta versão) + templates de texto
+  por produto com placeholders.
+- Envio de pacote por E-MAIL (prioridade): na seção "Mídia kit por e-mail" já existente,
+  escolher produto → template do produto → materiais do produto pré-marcados (filtrados pelo
+  idioma PT/EN/ES já existente) → pré-visualizar → enviar ao salvar (ou reenviar do
+  histórico), pelo pipeline atual (Gmail SMTP, email_status/email_sent_at/email_error).
+- Envio por WhatsApp (opcional, só se sobrar tempo): mesma composição de mensagem, aberta
+  via wa.me a partir do contato salvo, com registro do envio.
+- Evento: continua o campo de texto pré-preenchido (event_tag = "CIMI360 2026"). Sem
+  tabela de eventos nesta versão.
+
+### P1 — logo após o evento
+- Cadastro de evento estruturado (nome, data, local; event_id nos contatos; migração de
+  event_tag) e organizador (website, contato, cargos).
+- Importação da "Base Heitor" via CSV exportado do Google Contacts, com dedup por
+  telefone/e-mail e source='base_heitor'; contatos importados aparecem no histórico e no
+  DuplicateModal.
+- Tela de administração de materiais no app (ativar/desativar, editar, reordenar).
+- Ajuste de marca: cor primária #FA6800 (guia oficial; hoje #FA6801), Montserrat, uso correto
+  dos dois logos (vertical/horizontal), splash e ícones PWA revisados.
+- Migração da conta Google central para a conta do Heitor (com re-sync dos contatos).
+- Envio por WhatsApp (wa.me) se não couber no P0.
+
+### P2 — depois
+- Importação da "Base CIMI360" (fonte a definir).
+- Sincronização contínua com Google Contacts via People API (connections.list + syncToken).
+- Trocar Gmail SMTP (scope gmail.send, restrito) por Resend/Mailgun; depois verificação
+  formal do app OAuth no Google.
+- Limpeza dos drafts órfãos antigos (script com dry-run) e remoção de ContactHistory.tsx.
+- Câmera via getUserMedia, se a correção do input não bastar (só com teste no aparelho).
+
+## 5. Fora de escopo (explicitamente)
+
+- Multi-tenant / login por usuário (decisão de produto: single-account).
+- Hospedagem de arquivos (PDF/vídeo) no app; a biblioteca usa apenas links externos
+  (Drive, YouTube, Vimeo, Dropbox).
+- WhatsApp Business API / envio automático sem toque do operador (wa.me abre o app do
+  WhatsApp; o operador confirma o envio).
+- Pedir NOVOS scopes Google (o e-mail continua no pipeline atual até a troca de provedor em P2).
+- Landing page por lead com tracking de cliques.
+- Renomear repositório GitHub ou URL do Railway (risco de quebrar deploy antes do evento).
+- Migrar captura para getUserMedia.
+
+## 6. Requisitos funcionais
+
+Fase 0 / 1
+- RF01: O app OAuth DEVE estar em status "In production" no Google Cloud Console; a
+  reconexão do Google DEVE gerar refresh token sem expiração de 7 dias.
+- RF02: GET /api/health DEVE informar google_token_status (válido / expirado / ausente) para
+  o operador saber antes do evento se precisa reconectar.
+- RF03: Toda chamada nova ao backend DEVE usar o helper de fetch com timeout e a
+  classificação de erro existente (NetworkError / ApiError / ApiConflictError); nenhum fetch
+  cru.
+- RF04: DEVE existir staging: Vercel preview do PR apontando (via rewrites) para um Railway
+  PR environment com banco separado da produção.
+
+Taxonomia
+- RF05: O backend DEVE expor GET /api/taxonomy retornando interest_types, products e
+  profiles por produto, a partir de um único módulo de constantes (backend/app/taxonomy.py)
+  versionado no repo.
+- RF06: ALLOWED_TAGS DEVE ser derivado da taxonomia (superset), de forma que nenhuma tag
+  válida seja descartada pelo validator; tags existentes em produção continuam válidas.
+- RF07: A persistência DEVE reaproveitar a estrutura de classificação já existente
+  (produto + perfil único por produto, como hoje). Se a estrutura atual não comportar os
+  produtos novos, migrar para classification jsonb {"<product_key>": "<perfil>"} com
+  script idempotente que converte os dados existentes (CIMI Invest/CIMI 360) sem perda.
+  Valores inválidos DEVEM retornar 422. Perfis antigos de CIMI Invest (Parceria, Venda)
+  continuam legíveis no histórico/CSV, mas não são mais oferecidos na UI.
+- RF08: O frontend DEVE manter o padrão visual atual (checkbox do produto + radio dos
+  perfis) para os 5 produtos, na ordem CIMI 360, CIMI Invest, Leilão, INDIP, Feirão; o
+  estado é preservado no ContactEditor, no carrossel de revisão do modo batch e no
+  histórico. Listas de perfis vêm de /api/taxonomy, nunca hardcoded no frontend.
+- RF09: O CSV de exportação DEVE incluir colunas produtos (labels separados por ";"),
+  perfis ("Produto: Perfil A, Perfil B; Produto2: ..."), event_name e event_date.
+
+Eventos
+- RF10: DEVE existir a tabela events (id, name, date_start, date_end nullable, location,
+  kind: 'feira'|'missao'|'reuniao'|'outro', organizer_* nullable, created_at) com CRUD
+  em /api/events.
+- RF11: O operador DEVE poder selecionar o evento ativo em uma lista; a seleção persiste
+  entre scans (substitui o localStorage de event_tag) e pode ser limpa.
+- RF12: scanned_contacts DEVE ganhar event_id (FK nullable). Ao salvar com event_id, o
+  backend DEVE preencher event_tag com o nome do evento para manter compatibilidade com
+  histórico, filtros e CSV existentes.
+- RF13: Eventos existentes em event_tag (texto livre) DEVEM ser migrados para a tabela
+  events por um script idempotente, sem perda.
+
+Biblioteca de materiais e templates
+- RF14: DEVE existir a tabela materials (id, product, group, label, language nullable,
+  url, sort_order, active, meta jsonb para data/local de missões, created_at) e a tabela
+  message_templates (id, product, name, body, active).
+- RF15: DEVE existir endpoint de importação de materiais por CSV (mesmo layout do arquivo
+  entregue ao Henrique) idempotente por (product, group, label, language).
+- RF16: DEVE existir uma tela "Materiais" com listagem por produto/grupo, ativar/desativar,
+  editar label/url e reordenar; não há upload de arquivos.
+- RF17: Templates DEVEM suportar os placeholders {nome}, {primeiro_nome}, {evento},
+  {produto}; placeholders sem valor DEVEM ser removidos de forma limpa (sem "undefined").
+
+Envio por e-mail (prioridade)
+- RF18: A seção "Mídia kit por e-mail" do editor DEVE ganhar: seletor de produto (um dos 5,
+  pré-selecionado a partir da classificação do contato quando houver um único produto),
+  lista de materiais ativos do produto com checkboxes (pré-marcados os do grupo
+  "Institucional" e os do idioma escolhido em PT/EN/ES), e pré-visualização do corpo
+  (template do produto + lista "título — link"). O checkbox "Enviar Mídia Kit ao salvar"
+  passa a significar "enviar este pacote ao salvar".
+- RF19: O backend DEVE compor e enviar o e-mail pelo pipeline atual (mesma task agendada
+  pós-save, mesmo remetente, mesmos campos email_status/email_sent_at/email_error),
+  recebendo product, language, material_ids e template_id; sem e-mail válido no contato
+  o envio fica desabilitado com mensagem clara. Comportamento legado (mídia kit fixo)
+  DEVE continuar funcionando quando nenhum produto for escolhido.
+- RF20: Cada envio DEVE ser registrado em sent_materials (contact_id, channel='email',
+  product, language, material_ids int[], message_snapshot, sent_at, status) e o histórico
+  DEVE permitir "Reenviar" a partir do contato.
+- RF21: Se um item marcado estiver sem URL (inativo), ele NÃO entra no e-mail e o
+  preview avisa; o envio nunca sai com link vazio ou placeholder cru.
+
+Envio por WhatsApp (opcional)
+- RF22: A mesma composição (template + materiais) PODE ser aberta via
+  https://wa.me/<E164>?text=<encoded> a partir do contato salvo; telefone normalizado com
+  phonenumbers (região BR); link em <a href> no gesto do usuário; registro em
+  sent_materials com channel='whatsapp'. Só entra se RF18–RF21 estiverem em produção e
+  testados no Android antes de 26/08 12h.
+
+Importação de bases (P1/P2)
+- RF23: DEVE existir POST /api/contacts/import (CSV formato Google Contacts) que cria
+  contatos com source='base_heitor' (ou 'base_cimi360'), is_draft=false, sem enviar ao
+  Google (já estão lá), aplicando dedup por telefone/e-mail normalizados e produzindo um
+  relatório (criados, ignorados, conflitos).
+- RF24: O DuplicateModal DEVE identificar duplicidade também contra contatos importados.
+
+## 7. Requisitos não funcionais
+
+- RNF01: Segurança e privacidade — tokens OAuth só no backend; nenhuma chave em
+  frontend; endpoints administrativos (reprocessar drafts, importar CSV, importar materiais)
+  protegidos por header X-Admin-Token lido de variável de ambiente; sem PII em logs.
+- RNF02: Observabilidade — manter Sentry com breadcrumbs nos fluxos novos (classificar,
+  selecionar evento, enviar materiais) e replay mascarado (LGPD); log estruturado no backend
+  por request com rota, status, duração e contact_id; /api/health com status do token Google.
+- RNF03: Testabilidade — pytest cobrindo taxonomia, validators, normalização E.164,
+  templates, importação CSV e reprocessamento de drafts; vitest cobrindo chips de
+  classificação, montagem da mensagem e normalização; um teste E2E (Playwright, viewport
+  mobile) do fluxo scan→salvar→enviar materiais em staging. Cobertura mínima 70% nos
+  módulos novos.
+- RNF04: Performance — GET /api/taxonomy e GET /api/materials servidos em <200 ms e
+  cacheados no frontend (IndexedDB) para uso offline; nenhuma tela nova bloqueia o scanner.
+- RNF05: Compatibilidade — nenhuma mudança quebra o histórico, o modo batch offline, a fila
+  pending_saves ou o CSV existente; mudanças em IndexedDB só via db.ts com bump de versão
+  e upgrade idempotente; migrations aditivas (ADD COLUMN IF NOT EXISTS), com pg_dump antes.
+- RNF06: Operação — deploy freeze 48 h antes do evento; rollback via redeploy da versão
+  anterior no Railway documentado em README.
+
+## 8. Arquitetura inicial
+
+Backend (FastAPI):
+- backend/app/taxonomy.py — constantes INTEREST_TYPES, PRODUCTS (key, label, profiles).
+  ALLOWED_TAGS = INTEREST_TYPES. Endpoint GET /api/taxonomy.
+- backend/app/routers/materials.py, templates.py, admin.py (import CSV); o envio
+  reutiliza o router/serviço de e-mail existente, estendido para receber o pacote.
+- backend/app/services/package.py — composição do corpo (template + materiais por idioma),
+  usada por e-mail e, se houver tempo, por WhatsApp (phonenumbers para E.164).
+- backend/migrations/003_taxonomy.sql (se necessário), 004_materials.sql,
+  005_sent_materials.sql — todas aditivas.
+
+Frontend (Next.js):
+- Componente de classificação existente estendido para 5 produtos; PackagePicker.tsx
+  dentro da seção "Mídia kit por e-mail"; botão "Reenviar" no ContactListCard.
+- lib/taxonomy.ts (fetch + cache), lib/materials.ts (fetch + cache), lib/package.ts
+  (preview local do corpo).
+
+Integrações externas:
+- Google People API (já usada) — scope https://www.googleapis.com/auth/contacts cobre
+  leitura e escrita; leitura da base do Heitor via people.connections.list fica para P2.
+- WhatsApp via wa.me (sem API, sem chave). Nunca API não-oficial.
+- E-mail: pipeline atual (Gmail SMTP) é reutilizado para o pacote de materiais em P1;
+  troca por Resend/Mailgun (SPF/DKIM em cimi360.com.br) em P2.
+- Sentry já configurado; novos fluxos ganham breadcrumbs.
+
+Decisões tomadas:
+- Taxonomia em código (não em tabela) porque muda raramente, precisa de validação forte
+  e deploy é barato; endpoint evita duplicar a lista no frontend.
+- Materiais em tabela (não em código) porque Henrique vai editar links com frequência.
+- Importação da Base Heitor por CSV (não People API) no P1: zero dependência do OAuth,
+  zero risco para o evento; API fica para sincronização contínua em P2.
+
+## 9. Critérios de aceite
+
+- O sistema DEVE salvar um contato novo e ele DEVE aparecer no Google Contacts da conta
+  central em até 30 s, com is_draft=false, em teste real no Android do Heitor.
+- O sistema DEVE rejeitar com 422 um product/profile fora da taxonomia e DEVE aceitar
+  qualquer tag existente hoje em produção.
+- O sistema DEVE permitir cadastrar um evento e selecioná-lo; o contato salvo DEVE trazer
+  event_id e event_tag coerentes; filtros e CSV existentes DEVEM continuar funcionando.
+- O sistema DEVE enviar o e-mail com o corpo renderizado (sem placeholders crus, sem
+  "undefined", sem link vazio), contendo apenas os materiais marcados, e o envio DEVE
+  constar no histórico com status; o mídia kit legado DEVE continuar funcionando.
+- O sistema DEVE funcionar com a biblioteca de materiais em cache quando offline.
+- Os testes DEVEM passar em pre-commit e em CI antes de qualquer merge na main.
+- A documentação DEVE incluir: README atualizado (setup, variáveis de ambiente, rollback),
+  memórias no Basic Memory para cada decisão arquitetural deste PRD, e um roteiro de
+  smoke test manual de 10 passos para rodar após cada deploy.
+
+## 10. Riscos e validações
+
+- Risco: OAuth em Testing continua ativo no dia do evento → Validar: status "In production"
+  no console + reconexão + salvar contato de teste + verificar no Google Contacts. Plano B:
+  reconectar a conta na véspera (token vale 7 dias) e checar /api/health no dia.
+- Risco: fila pending_saves + novos campos (products/profiles/event_id) → save antigo na
+  fila sem os campos novos → Validar: backend trata campos ausentes como vazios; teste com
+  item enfileirado na versão anterior do IndexedDB.
+- Risco: validator filtra silenciosamente as novas categorias → Validar: teste unitário que
+  envia todas as categorias da taxonomia e verifica que nenhuma é descartada.
+- Risco: migration de event_tag → events gera eventos duplicados por variação de grafia →
+  Validar: normalizar (trim, case, espaços) e revisar relatório antes de aplicar; script em
+  dry-run primeiro.
+- Risco: e-mail de pacote quebra o mídia kit legado → Validar: teste que envia sem produto
+  e confirma corpo legado; teste com produto e confirma corpo novo.
+- Risco: e-mail cai em spam pelo volume de links → Validar: corpo em texto + HTML simples,
+  máximo de links razoável (≤ 10), teste real para Gmail e Outlook antes do evento.
+- Risco: Henrique não entrega todos os links a tempo → Validar: CSV com coluna de status;
+  materiais sem URL ficam active=false e não aparecem no picker.
+- Risco: deploy quebrar produção na véspera → Validar: staging obrigatório, freeze 48 h,
+  rollback testado uma vez antes do evento.
+
+## 11. Premissas
+
+- Evento CIMI360 em 27 e 28/08/2026; deploy final até 26/08 12h; freeze a partir daí.
+- App OAuth já em Production (24/08).
+- O Henrique entrega o CSV de materiais (ao menos os links do CIMI360 e CIMI Invest) até
+  25/08; itens sem link ficam inativos e não travam o resto.
+- O helper de fetch com timeout e a fila de retry (v0.3.x) são a base de todo request novo.
+- Heitor consegue exportar seus contatos do Google (Contatos → Exportar → Google CSV) ou
+  autoriza Henrique a fazê-lo.
+- Henrique preenche o CSV de materiais (links públicos ou "qualquer pessoa com o link").
+- Todos os telefones-alvo do WhatsApp são celulares com WhatsApp ativo.
+- Railway suporta ambiente de staging no plano atual.
+
+## 12. Métricas de sucesso
+
+- 0 contatos em is_draft=true após 24 h do evento (excluindo rascunhos intencionais).
+- 100% dos contatos do evento com pelo menos 1 produto/perfil e 1 evento associado.
+- ≥ 80% dos contatos com importância ≥ 2 recebem o pacote por e-mail no mesmo dia, com
+  email_status de sucesso.
+- Tempo médio scan → salvar → enviar ≤ 60 s (medido em campo pelo Henrique).
+- 0 rollbacks durante o evento.
