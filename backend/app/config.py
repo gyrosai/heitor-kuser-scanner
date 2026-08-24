@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic_settings import BaseSettings
 
@@ -17,9 +16,13 @@ class Settings(BaseSettings):
 
     EMAIL_DAILY_LIMIT: int = 500
     MEDIA_KIT_DIR: str = "./assets"
+
+    # Token para endpoints administrativos (/api/admin/*), enviado no header
+    # X-Admin-Token. Vazio = admin desabilitado (fail-closed: todo request 401).
+    ADMIN_TOKEN: str = ""
     
     @property
-    def origins_list(self) -> List[str]:
+    def origins_list(self) -> list[str]:
         origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
         if self.ENV == "production" and "*" in origins:
             raise ValueError(

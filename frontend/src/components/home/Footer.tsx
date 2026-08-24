@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import pkg from '../../../package.json';
 
 interface FooterProps {
@@ -7,6 +8,12 @@ interface FooterProps {
 export function Footer({ onAbout }: FooterProps) {
   return (
     <div className="px-4 pt-8 pb-7 text-center">
+      <Link
+        href="/materiais"
+        className="text-[11px] text-text-subtle underline hover:text-text-muted mb-3 block mx-auto"
+      >
+        Materiais
+      </Link>
       {onAbout && (
         <button
           type="button"
