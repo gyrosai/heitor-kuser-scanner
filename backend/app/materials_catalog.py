@@ -16,6 +16,8 @@ from app.taxonomy import get_product_label
 _CSV_NAME_TO_KEY: dict[str, str] = {
     "cimi360": "cimi_360",
     "cimi invest": "cimi_invest",
+    "leilão": "leilao",
+    "leilao": "leilao",  # tolera falta de acento
     "indip": "indip",
     "feirão dos corretores": "feirao",
     "feirao dos corretores": "feirao",  # tolera falta de acento
@@ -29,7 +31,14 @@ _EXTRA_PRODUCT_LABELS: dict[str, str] = {
 }
 
 # Ordem de exibição em GET /api/materials.
-PRODUCTS_ORDER: list[str] = ["cimi_360", "cimi_invest", "indip", "feirao", "reuniao"]
+PRODUCTS_ORDER: list[str] = [
+    "cimi_360",
+    "cimi_invest",
+    "leilao",
+    "indip",
+    "feirao",
+    "reuniao",
+]
 
 VALID_PRODUCT_KEYS: set[str] = set(PRODUCTS_ORDER)
 

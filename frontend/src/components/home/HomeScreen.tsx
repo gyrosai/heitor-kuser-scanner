@@ -337,7 +337,14 @@ export function HomeScreen({
           ) : (
             <div className="flex flex-col gap-[10px]">
               {filteredContacts.map((c) => (
-                <ContactListCard key={c.id} contact={c} onClick={() => onSelectContact(c.id)} />
+                <ContactListCard
+                  key={c.id}
+                  contact={c}
+                  onClick={() => onSelectContact(c.id)}
+                  // Reenviar abre o mesmo editor (mesmo seletor de produto/idioma/materiais
+                  // do EmailKitSection) — não há UI separada duplicando essa configuração.
+                  onResend={() => onSelectContact(c.id)}
+                />
               ))}
             </div>
           )}

@@ -15,7 +15,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import defer
 
 from app.database import async_session, get_db
-from app.db_models import ScannedContact
+from app.db_models import EmailLog, ScannedContact
 from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
 from app.models import (
     BatchImageItem,
@@ -436,6 +436,7 @@ async def create_vcard(
                 sender_email=current_user.email,
                 sender_name=current_user.name,
                 language=contact.email_language,
+                package=contact.package,
             )
         else:
             db_contact.email_status = "skipped"
@@ -701,8 +702,29 @@ async def list_contacts(
         query = query.where(and_(*filters))
 
     result = await db.execute(query)
+    rows = result.all()
+
+    # last_send: último envio (email_logs) de cada contato — campo aditivo,
+    # não quebra o formato existente. Uma query só para todos os ids da página.
+    contact_ids = [row[0].id for row in rows]
+    last_send_map: dict[int, dict] = {}
+    if contact_ids:
+        log_result = await db.execute(
+            select(EmailLog)
+            .where(EmailLog.contact_id.in_(contact_ids))
+            .order_by(EmailLog.contact_id, EmailLog.id.desc())
+        )
+        for log in log_result.scalars().all():
+            if log.contact_id not in last_send_map:
+                last_send_map[log.contact_id] = {
+                    "channel": log.channel,
+                    "product_key": log.product_key,
+                    "status": log.status,
+                    "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+                }
+
     out = []
-    for row in result.all():
+    for row in rows:
         c = row[0]
         has_image = bool(row[1])
         out.append(
@@ -730,6 +752,7 @@ async def list_contacts(
                 if getattr(c, "email_sent_at", None)
                 else None,
                 "email_error": getattr(c, "email_error", None),
+                "last_send": last_send_map.get(c.id),
             }
         )
     return out
@@ -948,6 +971,7 @@ async def merge_contact(
                     sender_email=current_user.email,
                     sender_name=current_user.name,
                     language=new_contact.email_language,
+                    package=new_contact.package,
                 )
             else:
                 db_contact.email_status = "skipped"
@@ -1126,6 +1150,7 @@ async def send_contact_email(
         user=current_user,
         language=payload.language,
         force=payload.force,
+        package=payload.package,
     )
 
     _status_to_http = {
@@ -1149,6 +1174,42 @@ async def send_contact_email(
         gmail_message_id=dispatch_result.gmail_message_id,
         quota_remaining=dispatch_result.quota_remaining,
     )
+
+
+@router.get("/contacts/{contact_id}/sends")
+async def list_contact_sends(contact_id: int, db=Depends(get_db)):
+    """Histórico de envios (e-mail, e futuramente WhatsApp) do contato.
+
+    Reaproveita email_logs — não há tabela separada de "sent_materials".
+    Mais recente primeiro.
+    """
+    if db is None:
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado")
+
+    result = await db.execute(
+        select(EmailLog)
+        .where(EmailLog.contact_id == contact_id)
+        .order_by(EmailLog.id.desc())
+    )
+    logs = result.scalars().all()
+    return {
+        "sends": [
+            {
+                "id": log.id,
+                "channel": log.channel,
+                "product_key": log.product_key,
+                "material_ids": list(log.material_ids or []),
+                "template_id": log.template_id,
+                "language": log.idioma,
+                "subject": log.subject,
+                "status": log.status,
+                "error": log.error_message,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+            }
+            for log in logs
+        ]
+    }
 
 
 @router.get("/contacts/{contact_id}/image")

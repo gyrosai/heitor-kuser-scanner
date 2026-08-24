@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import {
   ALLOWED_TAGS,
   ClassificacaoState,
   ContactData,
   ContactRecord,
   EmailLanguage,
+  PackageSelection,
   isInterestTag,
 } from "@/lib/types";
 import { classificacoesToTags, tagsToClassificacoes } from "@/lib/taxonomy";
@@ -34,6 +36,13 @@ import {
   StarRating,
   Textarea,
 } from "@/components/ui";
+import {
+  MaterialsPayload,
+  TemplatesPayload,
+  getMaterialsCached,
+  getTemplatesCached,
+} from "@/lib/materials";
+import { defaultMaterialIds, pickDefaultProduct } from "@/lib/package";
 
 interface ContactEditorProps {
   contactId: number;
@@ -120,6 +129,12 @@ export default function ContactEditor({
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<EmailLanguage>("pt-BR");
 
+  // Pacote de materiais: opcional, tudo aditivo (ver EmailKitSection).
+  const [materialsData, setMaterialsData] = useState<MaterialsPayload | null>(null);
+  const [templatesData, setTemplatesData] = useState<TemplatesPayload | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
+
   useEffect(() => {
     let cancel = false;
     setLoading(true);
@@ -144,6 +159,25 @@ export default function ContactEditor({
           email_language: rec.email_language ?? "pt-BR",
         });
         setSelectedLanguage(rec.email_language ?? "pt-BR");
+
+        getMaterialsCached().then(({ materials }) => {
+          if (cancel) return;
+          setMaterialsData(materials);
+          const preselected = pickDefaultProduct(
+            classificationState,
+            materials.products.map((p) => p.key),
+          );
+          if (preselected) {
+            const product = materials.products.find((p) => p.key === preselected);
+            setSelectedProduct(preselected);
+            setSelectedMaterialIds(
+              product ? defaultMaterialIds(product.groups, rec.email_language ?? "pt-BR") : [],
+            );
+          }
+        });
+        getTemplatesCached().then(({ templates }) => {
+          if (!cancel) setTemplatesData(templates);
+        });
       })
       .catch((e) => {
         console.error("Erro ao carregar contato:", e);
@@ -159,6 +193,20 @@ export default function ContactEditor({
       cancel = true;
     };
   }, [contactId, onClose, showToast]);
+
+  const handleProductChange = (productKey: string | null) => {
+    setSelectedProduct(productKey);
+    Sentry.addBreadcrumb({
+      category: "package",
+      message: "package_product_selected",
+      data: { product_key: productKey },
+    });
+  };
+
+  const currentPackage = (): PackageSelection | null =>
+    selectedProduct
+      ? { product_key: selectedProduct, material_ids: selectedMaterialIds }
+      : null;
 
   const update = <K extends keyof ContactData>(
     field: K,
@@ -202,8 +250,16 @@ export default function ContactEditor({
           showToast("Contato salvo. Envio offline — tente enviar quando estiver online.", "info");
         } else {
           try {
-            await sendMediaKit(contactId, { language: selectedLanguage });
-            showToast("Mídia Kit enviado.", "success");
+            const pkg = currentPackage();
+            if (pkg) {
+              Sentry.addBreadcrumb({
+                category: "package",
+                message: "package_sent",
+                data: { product_key: pkg.product_key, material_ids: pkg.material_ids },
+              });
+            }
+            await sendMediaKit(contactId, { language: selectedLanguage, package: pkg });
+            showToast(pkg ? "Pacote enviado." : "Mídia Kit enviado.", "success");
           } catch (sendError) {
             showToast(
               sendError instanceof Error
@@ -266,8 +322,16 @@ export default function ContactEditor({
   const handleResend = async () => {
     setSaving(true);
     try {
-      await sendMediaKit(contactId, { language: selectedLanguage, force: true });
-      showToast("Mídia Kit reenviado.", "success");
+      const pkg = currentPackage();
+      if (pkg) {
+        Sentry.addBreadcrumb({
+          category: "package",
+          message: "package_sent",
+          data: { product_key: pkg.product_key, material_ids: pkg.material_ids },
+        });
+      }
+      await sendMediaKit(contactId, { language: selectedLanguage, force: true, package: pkg });
+      showToast(pkg ? "Pacote reenviado." : "Mídia Kit reenviado.", "success");
       const refreshed = await getContact(contactId);
       setOriginal(refreshed);
     } catch (e) {
@@ -283,8 +347,9 @@ export default function ContactEditor({
   const handleRetry = async () => {
     setSaving(true);
     try {
-      await sendMediaKit(contactId, { language: selectedLanguage });
-      showToast("Mídia Kit enviado.", "success");
+      const pkg = currentPackage();
+      await sendMediaKit(contactId, { language: selectedLanguage, package: pkg });
+      showToast(pkg ? "Pacote enviado." : "Mídia Kit enviado.", "success");
       const refreshed = await getContact(contactId);
       setOriginal(refreshed);
     } catch (e) {
@@ -429,6 +494,7 @@ export default function ContactEditor({
           emailError={original.email_error}
           contactEmail={form.email}
           contactName={form.name}
+          eventTag={form.event_tag}
           senderEmail={senderEmail}
           checked={emailEnabled}
           onCheckedChange={setEmailEnabled}
@@ -441,6 +507,12 @@ export default function ContactEditor({
           onRetry={handleRetry}
           quotaExhausted={quotaExhausted}
           networkOnline={online}
+          materialsData={materialsData}
+          templatesData={templatesData}
+          selectedProduct={selectedProduct}
+          onProductChange={handleProductChange}
+          selectedMaterialIds={selectedMaterialIds}
+          onMaterialIdsChange={setSelectedMaterialIds}
         />
 
         <Divider />

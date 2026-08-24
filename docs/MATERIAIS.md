@@ -26,7 +26,7 @@ Exemplo pronto (sem urls): [`materiais-exemplo.csv`](./materiais-exemplo.csv).
 
 | Coluna | Descrição |
 |---|---|
-| `produto` | `CIMI360`, `CIMI Invest`, `INDIP`, `Feirão dos Corretores` ou `Reunião aleatória`. Nome desconhecido → a linha vira erro no relatório (o resto do arquivo continua). |
+| `produto` | `CIMI360`, `CIMI Invest`, `Leilão`, `INDIP`, `Feirão dos Corretores` ou `Reunião aleatória`. Nome desconhecido → a linha vira erro no relatório (o resto do arquivo continua). |
 | `grupo` | Agrupamento livre. Ex.: `Institucional`, `Mídia Kit`, `Vídeo`, `MOU`, `Missões Comerciais`, `Kit documentos`, `Texto`. |
 | `item` | Rótulo do material/template exibido na tela. |
 | `tipo` | `link` (material com url) · `texto` (template de mensagem, usa a coluna `texto`) · `evento` (missão comercial: url + `data` + `local`). |
@@ -54,6 +54,7 @@ depois (ex.: colar a url e reimportar, ou ativar via `PATCH`).
 |---|---|---|
 | CIMI360 | `cimi_360` | CIMI 360 |
 | CIMI Invest | `cimi_invest` | CIMI Invest |
+| Leilão | `leilao` | Leilão |
 | INDIP | `indip` | INDIP |
 | Feirão dos Corretores | `feirao` | Feirão dos Corretores |
 | Reunião aleatória | `reuniao` | Reunião |

@@ -14,6 +14,17 @@ export type EmailLanguage = "pt-BR" | "en" | "es";
 /** Estado de classificação: { product_key: slug | null } */
 export type ClassificacaoState = Record<string, string | null>;
 
+/**
+ * Seleção de pacote de materiais para o e-mail pós-save. Ausente = mídia kit
+ * fixo (comportamento legado, idêntico ao anterior). Espelha
+ * backend/app/models.py::PackageSelection.
+ */
+export interface PackageSelection {
+  product_key: string;
+  material_ids: number[];
+  template_id?: number | null;
+}
+
 export interface ContactData {
   name: string;
   phone: string | null;
@@ -29,6 +40,15 @@ export interface ContactData {
   email_language: EmailLanguage;
   send_email?: boolean;
   incomplete?: boolean;
+  package?: PackageSelection | null;
+}
+
+/** Último envio (e-mail, futuramente WhatsApp) registrado para o contato. */
+export interface LastSend {
+  channel: string;
+  product_key: string | null;
+  status: string;
+  sent_at: string | null;
 }
 
 export interface ContactRecord extends ContactData {
@@ -41,6 +61,7 @@ export interface ContactRecord extends ContactData {
   email_status?: "sent" | "failed" | "skipped" | null;
   email_sent_at?: string | null;
   email_error?: string | null;
+  last_send?: LastSend | null;
 }
 
 export interface ScanResponse {

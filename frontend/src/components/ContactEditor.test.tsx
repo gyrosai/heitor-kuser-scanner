@@ -24,6 +24,18 @@ const RECORD: ContactRecord = {
 
 const showToast = vi.fn();
 const updateContact = vi.fn();
+const sendMediaKit = vi.fn(async () => ({ status: "sent" }));
+
+// vi.hoisted: vi.mock é hoisted pro topo do arquivo, então os objetos
+// mutáveis que os testes configuram por caso (contato/materiais/templates)
+// precisam nascer junto, senão vira TDZ ("Cannot access before initialization").
+const materialsState = vi.hoisted(() => ({
+  materials: { products: [] as import("@/lib/materials").MaterialProduct[] },
+  templates: { templates: [] as import("@/lib/materials").MessageTemplate[] },
+}));
+
+const contactState = vi.hoisted(() => ({ record: null as unknown }));
+contactState.record = RECORD;
 
 vi.mock("./Toast", () => ({
   useToast: () => ({ showToast }),
@@ -39,13 +51,23 @@ vi.mock("@/lib/taxonomy", async (importOriginal) => {
   return { ...mod, getTaxonomyCached: vi.fn(async () => ({ products: [], legacy_profiles: {}, interest_types: [] })) };
 });
 
+// EmailKitSection busca materiais/templates via rede — mockado pra não depender de fetch.
+vi.mock("@/lib/materials", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/materials")>();
+  return {
+    ...mod,
+    getMaterialsCached: vi.fn(async () => ({ materials: materialsState.materials, offline: false })),
+    getTemplatesCached: vi.fn(async () => ({ templates: materialsState.templates, offline: false })),
+  };
+});
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...mod,
-    getContact: vi.fn(async () => RECORD),
+    getContact: vi.fn(async () => contactState.record as ContactRecord),
     updateContact: (...args: unknown[]) => updateContact(...args),
-    sendMediaKit: vi.fn(),
+    sendMediaKit: (...args: Parameters<typeof sendMediaKit>) => sendMediaKit(...args),
     syncContactToGoogle: vi.fn(),
     deleteContact: vi.fn(),
   };
@@ -54,6 +76,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
 describe("ContactEditor — 422 no save direto", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    contactState.record = RECORD;
+    materialsState.materials = { products: [] };
+    materialsState.templates = { templates: [] };
   });
 
   it("mostra a mensagem do backend e mantém o formulário editável (não navega, não limpa)", async () => {
@@ -89,5 +114,72 @@ describe("ContactEditor — 422 no save direto", () => {
     expect(onSaved).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^Nome/)).toHaveValue("Nome Editado");
+  });
+});
+
+describe("ContactEditor — pacote de materiais / Reenviar", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    contactState.record = RECORD;
+    materialsState.materials = { products: [] };
+    materialsState.templates = { templates: [] };
+  });
+
+  it("pré-seleciona o produto único da classificação e Reenviar chama sendMediaKit com o pacote", async () => {
+    contactState.record = {
+      ...RECORD,
+      email: "lead@example.com",
+      tags: ["cimi_360:stand"],
+      email_status: "sent",
+      email_sent_at: "2026-08-24T18:00:00Z",
+    };
+    materialsState.materials = {
+      products: [
+        {
+          key: "cimi_360",
+          label: "CIMI 360",
+          groups: [
+            {
+              name: "Institucional",
+              items: [
+                {
+                  id: 1,
+                  label: "Mídia Kit PT",
+                  kind: "link",
+                  language: "PT",
+                  url: "https://x/kit",
+                  meta: {},
+                  sort_order: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    materialsState.templates = {
+      templates: [
+        { id: 9, product_key: "cimi_360", name: "Texto padrão", body: "Olá {primeiro_nome}." },
+      ],
+    };
+
+    render(
+      <ContactEditor contactId={1} onClose={vi.fn()} onSaved={vi.fn()} onDeleted={vi.fn()} />,
+    );
+
+    // Produto pré-selecionado (classificação tem só cimi_360) — chip ativo aparece,
+    // e o checklist de materiais dele já é mostrado.
+    await screen.findByText("Mídia Kit PT (PT)");
+
+    fireEvent.click(screen.getByText("Reenviar"));
+
+    await waitFor(() => {
+      expect(sendMediaKit).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          package: { product_key: "cimi_360", material_ids: [1] },
+        }),
+      );
+    });
   });
 });

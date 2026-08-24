@@ -6,6 +6,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.materials_catalog import VALID_PRODUCT_KEYS
 from app.taxonomy import ALLOWED_TAGS_SET, INTEREST_TYPES, is_valid_classification
 
 # ── Tipos compartilhados ──────────────────────────────────────────────────────
@@ -16,6 +17,27 @@ logger = logging.getLogger(__name__)
 
 # Compatibilidade: ALLOWED_TAGS é o nome antigo usado em vários imports
 ALLOWED_TAGS = list(INTEREST_TYPES)
+
+
+class PackageSelection(BaseModel):
+    """Seleção de pacote de materiais para o e-mail pós-save.
+
+    Ausente (None) em ContactData/SendEmailRequest = comportamento legado
+    (mídia kit fixo, sem produto). Presente = compose_package monta o corpo
+    a partir do template + materiais do produto. O idioma do pacote é o
+    mesmo já carregado em email_language/language — não duplicado aqui.
+    """
+
+    product_key: str
+    material_ids: list[int] = []
+    template_id: Optional[int] = None
+
+    @field_validator("product_key")
+    @classmethod
+    def validate_product_key(cls, v):
+        if v not in VALID_PRODUCT_KEYS:
+            raise ValueError(f"product_key desconhecido: {v}")
+        return v
 
 
 class ContactData(BaseModel):
@@ -33,6 +55,7 @@ class ContactData(BaseModel):
     tags: list[str] = []
     email_language: Language = "pt-BR"
     send_email: bool = False
+    package: Optional[PackageSelection] = None
 
     @field_validator("importance", mode="before")
     @classmethod
@@ -113,9 +136,11 @@ class BatchScanResponse(BaseModel):
 
 # ── E-mail explícito ──────────────────────────────────────────────────────────
 
+
 class SendEmailRequest(BaseModel):
     language: Optional[Language] = None
     force: bool = False
+    package: Optional[PackageSelection] = None
 
 
 class SendEmailResponse(BaseModel):
