@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import {
   ALLOWED_TAGS,
   ClassificacaoState,
   ContactData,
   EmailLanguage,
   Importance,
+  PackageSelection,
   classificacoesToTags,
   isInterestTag,
   tagsToClassificacoes,
@@ -28,6 +30,13 @@ import ObservacaoAudio from "./contact/ObservacaoAudio";
 import EmailKitSection from "./contact/EmailKitSection";
 import CapturePreview from "./scan/CapturePreview";
 import { AlertCircle, Camera } from "lucide-react";
+import {
+  MaterialsPayload,
+  TemplatesPayload,
+  getMaterialsCached,
+  getTemplatesCached,
+} from "@/lib/materials";
+import { defaultMaterialIds, pickDefaultProduct } from "@/lib/package";
 
 const LEGACY_EVENT_KEY = "heitor_scanner_last_event_tag";
 export const LAST_EVENT_KEY = "cimi_leads_last_event_tag";
@@ -87,6 +96,46 @@ export default function ContactPreview({
     contact.email_language ?? "pt-BR"
   );
 
+  // Pacote de materiais: opcional, tudo aditivo. Sem produto selecionado o
+  // fluxo continua sendo o mídia kit fixo (legado), idêntico ao anterior.
+  const [materialsData, setMaterialsData] = useState<MaterialsPayload | null>(null);
+  const [templatesData, setTemplatesData] = useState<TemplatesPayload | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    let cancel = false;
+    getMaterialsCached().then(({ materials }) => {
+      if (cancel) return;
+      setMaterialsData(materials);
+      const preselected = pickDefaultProduct(
+        classificacao,
+        materials.products.map((p) => p.key),
+      );
+      if (preselected) {
+        const product = materials.products.find((p) => p.key === preselected);
+        setSelectedProduct(preselected);
+        setSelectedMaterialIds(product ? defaultMaterialIds(product.groups, emailLanguage) : []);
+      }
+    });
+    getTemplatesCached().then(({ templates }) => {
+      if (!cancel) setTemplatesData(templates);
+    });
+    return () => {
+      cancel = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleProductChange = (productKey: string | null) => {
+    setSelectedProduct(productKey);
+    Sentry.addBreadcrumb({
+      category: "package",
+      message: "package_product_selected",
+      data: { product_key: productKey },
+    });
+  };
+
   // O save tem timeout de 30s — se demorar mais que ~8s, avisa que ainda está
   // trabalhando pra não deixar o usuário olhando um botão travado no escuro.
   const [slowSave, setSlowSave] = useState(false);
@@ -127,6 +176,9 @@ export default function ContactPreview({
     const allTags = [...(form.tags || []), ...classificationTags];
 
     const shouldSendEmail = emailEnabled && !quotaExhausted && online;
+    const packageSelection: PackageSelection | null = selectedProduct
+      ? { product_key: selectedProduct, material_ids: selectedMaterialIds }
+      : null;
 
     const payload: ContactData = {
       ...form,
@@ -135,6 +187,7 @@ export default function ContactPreview({
       tags: allTags,
       send_email: shouldSendEmail,
       email_language: emailLanguage,
+      package: packageSelection,
     };
 
     // Estes toasts falam SÓ do Mídia Kit — o save ainda nem aconteceu, então
@@ -146,6 +199,17 @@ export default function ContactPreview({
       // TODO Fase 5C: ao voltar online, identificar contatos com email_status='skipped' recentes E preferência de
       //              envio originalmente true, e disparar retry. Requer 'queued' no backend pra ser semanticamente correto.
       showToast("Sem conexão — o Mídia Kit não será enviado agora.", "info");
+    }
+
+    if (shouldSendEmail && packageSelection) {
+      Sentry.addBreadcrumb({
+        category: "package",
+        message: "package_sent",
+        data: {
+          product_key: packageSelection.product_key,
+          material_ids: packageSelection.material_ids,
+        },
+      });
     }
 
     onSave(payload);
@@ -278,6 +342,7 @@ export default function ContactPreview({
           emailStatus={null}
           contactEmail={form.email}
           contactName={form.name}
+          eventTag={form.event_tag}
           senderEmail={senderEmail}
           checked={emailEnabled}
           onCheckedChange={setEmailEnabled}
@@ -285,6 +350,12 @@ export default function ContactPreview({
           onLanguageChange={setEmailLanguage}
           quotaExhausted={quotaExhausted}
           networkOnline={online}
+          materialsData={materialsData}
+          templatesData={templatesData}
+          selectedProduct={selectedProduct}
+          onProductChange={handleProductChange}
+          selectedMaterialIds={selectedMaterialIds}
+          onMaterialIdsChange={setSelectedMaterialIds}
         />
 
         <div className="space-y-2">

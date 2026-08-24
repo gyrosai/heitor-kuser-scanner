@@ -74,7 +74,9 @@ async def test_send_email_success():
 
 @pytest.mark.asyncio
 async def test_send_email_no_email_returns_contact_has_no_email():
-    """Contato sem e-mail: retorna contact_has_no_email sem tocar no DB."""
+    """Contato sem e-mail: retorna contact_has_no_email; contato não é
+    alterado, mas fica registrado em auditoria (EmailLog status='skipped')
+    — nunca bloqueia o save."""
     contact = _make_contact(email=None)
     user = _make_user()
     db = _make_db()
@@ -82,7 +84,10 @@ async def test_send_email_no_email_returns_contact_has_no_email():
     result = await dispatch_media_kit_email(db, contact, user)
 
     assert result.status == "contact_has_no_email"
-    db.commit.assert_not_called()
+    db.commit.assert_called_once()
+    logged = db.add.call_args.args[0]
+    assert logged.status == "skipped"
+    assert logged.contact_id == contact.id
 
 
 @pytest.mark.asyncio
@@ -128,6 +133,45 @@ async def test_send_email_force_reenvia():
     assert result.gmail_message_id == "gmail_resend999"
     assert contact.email_status == "sent"
     assert contact.email_gmail_message_id == "gmail_resend999"
+
+
+@pytest.mark.asyncio
+async def test_send_email_snapshot_covers_all_five_products():
+    """classificacoes_snapshot deve cobrir os 5 produtos da taxonomia, não só
+    cimi_360/cimi_invest (regressão do filtro hardcoded antigo)."""
+    contact = _make_contact(
+        tags=[
+            "cimi_360:stand",
+            "cimi_invest:investidor",
+            "leilao:comprador",
+            "indip:parceiro",
+            "feirao:corretor_de_imoveis",
+            "Patrocínio",  # tag de interesse, sem ":" válido de produto — deve ser ignorada
+        ]
+    )
+    user = _make_user()
+    db = _make_db()
+
+    with (
+        patch(
+            "app.services.email_dispatch.check_daily_quota",
+            return_value={"remaining": 100, "used": 0, "limit": 500, "sender_email": user.email},
+        ),
+        patch(
+            "app.services.email_dispatch.send_via_gmail",
+            new=AsyncMock(return_value={"id": "gmail_snap", "threadId": "thread_snap"}),
+        ),
+    ):
+        await dispatch_media_kit_email(db, contact, user)
+
+    logged = db.add.call_args.args[0]
+    assert set(logged.classificacoes_snapshot) == {
+        "cimi_360:stand",
+        "cimi_invest:investidor",
+        "leilao:comprador",
+        "indip:parceiro",
+        "feirao:corretor_de_imoveis",
+    }
 
 
 @pytest.mark.asyncio

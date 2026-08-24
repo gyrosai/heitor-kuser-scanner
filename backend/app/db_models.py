@@ -77,6 +77,20 @@ class EmailLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True), nullable=True)
 
+    # ── Pacote de materiais (migration 011) ──────────────────────────────────
+    # channel: 'email' hoje; gancho para 'whatsapp' futuro no mesmo log.
+    # product_key/material_ids/template_id NULL/vazio = envio legado (mídia kit
+    # fixo, sem produto/materiais selecionados).
+    channel = Column(
+        String(20), nullable=False, server_default="email", default="email"
+    )
+    product_key = Column(Text, nullable=True)
+    material_ids = Column(
+        ARRAY(Integer), nullable=False, server_default="{}", default=list
+    )
+    template_id = Column(Integer, ForeignKey("message_templates.id"), nullable=True)
+    message_snapshot = Column(Text, nullable=True)
+
 
 class Material(Base):
     """Material de um produto: link externo ou evento (missão comercial).

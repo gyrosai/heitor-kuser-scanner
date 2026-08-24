@@ -6,6 +6,7 @@ import {
   ContactData,
   ContactRecord,
   EventInfo,
+  PackageSelection,
   ScanResponse,
   TagInfo,
 } from "./types";
@@ -516,7 +517,7 @@ export async function getEmailQuota(): Promise<EmailQuota | null> {
 
 export async function sendMediaKit(
   contactId: number,
-  opts?: { language?: string; force?: boolean },
+  opts?: { language?: string; force?: boolean; package?: PackageSelection | null },
 ): Promise<{ status: string; gmail_message_id?: string }> {
   const res = await doFetch(
     `${API_URL}/api/contacts/${contactId}/send-email`,
@@ -527,6 +528,7 @@ export async function sendMediaKit(
       body: JSON.stringify({
         language: opts?.language ?? "pt-BR",
         force: opts?.force ?? false,
+        package: opts?.package ?? null,
       }),
     },
     MUTATION_TIMEOUT_MS,
@@ -560,6 +562,31 @@ export async function sendMediaKit(
   }
 
   return res.json();
+}
+
+export interface ContactSendRecord {
+  id: number;
+  channel: string;
+  product_key: string | null;
+  material_ids: number[];
+  template_id: number | null;
+  language: string;
+  subject: string;
+  status: string;
+  error: string | null;
+  created_at: string | null;
+  sent_at: string | null;
+}
+
+/** Histórico de envios (e-mail, futuramente WhatsApp) de um contato. */
+export async function getContactSends(contactId: number): Promise<ContactSendRecord[]> {
+  const res = await doFetch(
+    `${API_URL}/api/contacts/${contactId}/sends`,
+    { credentials: "include" },
+    READ_TIMEOUT_MS,
+  );
+  const body = await jsonOrThrow<{ sends: ContactSendRecord[] }>(res);
+  return body.sends;
 }
 
 export async function sendTestEmail(

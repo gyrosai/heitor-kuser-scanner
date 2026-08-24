@@ -1,6 +1,6 @@
-import { QrCode, Cloud, CloudOff, Mail, MailCheck, AlertCircle, Star } from 'lucide-react';
-import { ContactRecord } from '@/lib/types';
-import { tagsToClassificacoes } from '@/lib/taxonomy';
+import { QrCode, Cloud, CloudOff, Mail, MailCheck, AlertCircle, Star, RefreshCw } from 'lucide-react';
+import { ContactRecord, LastSend } from '@/lib/types';
+import { FALLBACK_TAXONOMY, getProductLabel, tagsToClassificacoes } from '@/lib/taxonomy';
 import { getContactImageUrl } from '@/lib/api';
 import { ClassificationChip, ClassificationChipData } from './ClassificationChip';
 import { useState } from 'react';
@@ -8,6 +8,40 @@ import { useState } from 'react';
 interface ContactListCardProps {
   contact: ContactRecord;
   onClick: () => void;
+  /** Abre o editor já pronto pra reconfigurar produto/idioma/materiais e reenviar. */
+  onResend?: () => void;
+}
+
+// "reuniao" é produto só de materiais (não está na taxonomia de classificação).
+const EXTRA_PRODUCT_LABELS: Record<string, string> = { reuniao: 'Reunião' };
+
+function productLabel(key: string | null): string | null {
+  if (!key) return null;
+  return getProductLabel(FALLBACK_TAXONOMY, key) ?? EXTRA_PRODUCT_LABELS[key] ?? key;
+}
+
+function formatLastSend(lastSend: LastSend | null | undefined): string | null {
+  if (!lastSend) return null;
+  const product = productLabel(lastSend.product_key);
+  const date = lastSend.sent_at
+    ? new Date(lastSend.sent_at).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+
+  if (lastSend.status === 'sent') {
+    return ['E-mail enviado', product, date].filter(Boolean).join(' · ');
+  }
+  if (lastSend.status === 'failed') {
+    return 'Falhou';
+  }
+  if (lastSend.status === 'skipped') {
+    return 'Não enviado';
+  }
+  return [lastSend.status, product].filter(Boolean).join(' · ');
 }
 
 function initials(name: string): string {
@@ -118,16 +152,21 @@ function EmailBadge({ status }: { status: ContactRecord['email_status'] }) {
   return null;
 }
 
-export function ContactListCard({ contact, onClick }: ContactListCardProps) {
+export function ContactListCard({ contact, onClick, onResend }: ContactListCardProps) {
   const chips = getChips(contact.tags ?? []);
   const importance = contact.importance ?? 0;
   const synced = !!contact.google_contact_id;
+  const lastSendLabel = formatLastSend(contact.last_send);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="w-full flex gap-3 bg-white border border-border-default rounded-2xl p-3 text-left active:bg-app-bg transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick();
+      }}
+      className="w-full flex gap-3 bg-white border border-border-default rounded-2xl p-3 text-left active:bg-app-bg transition-colors cursor-pointer"
     >
       <Thumb contact={contact} />
 
@@ -165,7 +204,34 @@ export function ContactListCard({ contact, onClick }: ContactListCardProps) {
           <SyncBadge synced={synced} />
           <EmailBadge status={contact.email_status ?? null} />
         </div>
+
+        {lastSendLabel && (
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <span
+              className={
+                contact.last_send?.status === 'failed'
+                  ? 'text-[11px] font-semibold text-danger-fg'
+                  : 'text-[11px] font-semibold text-text-subtle'
+              }
+            >
+              {lastSendLabel}
+            </span>
+            {onResend && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResend();
+                }}
+                className="inline-flex items-center gap-1 min-h-10 px-2 -my-2 text-[11px] font-bold text-laranja-360"
+              >
+                <RefreshCw size={11} strokeWidth={2.4} />
+                Reenviar
+              </button>
+            )}
+          </div>
+        )}
       </div>
-    </button>
+    </div>
   );
 }

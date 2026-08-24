@@ -323,7 +323,7 @@
           "12",
           "13"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -391,7 +391,8 @@
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break the service into template rendering/placeholder replacement, material filtering rules, package assembly/output formatting, legacy media-kit fallback behavior, and unit/regression tests for different language/product combinations."
+        "expansionPrompt": "Break the service into template rendering/placeholder replacement, material filtering rules, package assembly/output formatting, legacy media-kit fallback behavior, and unit/regression tests for different language/product combinations.",
+        "updatedAt": "2026-08-24T22:56:37.304Z"
       },
       {
         "id": "16",
@@ -597,7 +598,7 @@
           "15",
           "16"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -699,7 +700,8 @@
         ],
         "complexity": 8,
         "recommendedSubtasks": 7,
-        "expansionPrompt": "Break the feature into product selector state, auto-selection rules, material checklist defaults, live preview rendering via the shared package service, legacy fallback behavior, resend flow integration, and component/regression tests."
+        "expansionPrompt": "Break the feature into product selector state, auto-selection rules, material checklist defaults, live preview rendering via the shared package service, legacy fallback behavior, resend flow integration, and component/regression tests.",
+        "updatedAt": "2026-08-24T22:56:37.322Z"
       },
       {
         "id": "19",
@@ -713,7 +715,7 @@
           "16",
           "18"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -811,7 +813,8 @@
         ],
         "complexity": 8,
         "recommendedSubtasks": 7,
-        "expansionPrompt": "Split into send-pipeline contract changes, sent_materials schema and persistence, message composition integration, resend support, missing-email disablement, legacy fixed-path compatibility, and backend/SMTP tests with history assertions."
+        "expansionPrompt": "Split into send-pipeline contract changes, sent_materials schema and persistence, message composition integration, resend support, missing-email disablement, legacy fixed-path compatibility, and backend/SMTP tests with history assertions.",
+        "updatedAt": "2026-08-24T22:56:37.326Z"
       },
       {
         "id": "20",
@@ -1050,9 +1053,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-24T20:55:26.929Z",
+      "lastModified": "2026-08-24T22:56:37.326Z",
       "taskCount": 12,
-      "completedCount": 4,
+      "completedCount": 7,
       "tags": [
         "master"
       ]

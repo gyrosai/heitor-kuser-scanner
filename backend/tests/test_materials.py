@@ -42,6 +42,8 @@ CSV_SAMPLE = CSV_HEADER + (
     "CIMI Invest,Texto,Texto padrão,texto,,,Olá {primeiro_nome} sobre {produto},,,1,ok,\n"
     # evento com data/local
     "INDIP,Missões Comerciais,Missão Dubai,evento,,https://example.com/dubai,,2026-10-01,Dubai,1,ok,\n"
+    # produto Leilão → deve ser reconhecido (product_key=leilao)
+    "Leilão,Institucional,Edital Leilão,link,,https://example.com/edital,,,,1,ok,\n"
     # produto desconhecido → erro de linha
     "Produto Inexistente,Grupo,Item,link,,https://example.com/x,,,,1,ok,\n"
     # status != ok → inativo mesmo com url
@@ -142,13 +144,13 @@ async def test_real_import_creates(client: AsyncClient):
     )
     assert resp.status_code == 200
     body = resp.json()
-    # 5 materiais (2 links ok, 1 link sem url, 1 evento, 1 feirao inativo) criados
-    # + 1 template. Produto desconhecido vai para errors.
-    assert body["created"] == 6
+    # 6 materiais (2 links ok, 1 link sem url, 1 evento, 1 leilão, 1 feirao inativo)
+    # criados + 1 template. Produto desconhecido vai para errors.
+    assert body["created"] == 7
     assert body["updated"] == 0
 
     listing = (await client.get("/api/admin/materials", headers=ADMIN_HEADERS)).json()
-    assert len(listing["materials"]) == 5  # templates não aparecem aqui
+    assert len(listing["materials"]) == 6  # templates não aparecem aqui
 
 
 @pytest.mark.asyncio
@@ -160,7 +162,7 @@ async def test_reimport_is_idempotent(client: AsyncClient):
             headers=ADMIN_HEADERS,
         )
     ).json()
-    assert first["created"] == 6
+    assert first["created"] == 7
 
     second = (
         await client.post(
@@ -170,7 +172,7 @@ async def test_reimport_is_idempotent(client: AsyncClient):
         )
     ).json()
     assert second["created"] == 0
-    assert second["updated"] == 6
+    assert second["updated"] == 7
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -190,7 +192,32 @@ async def test_unknown_product_goes_to_errors_rest_persists(client: AsyncClient)
     reasons = " ".join(e["reason"] for e in body["errors"])
     assert "produto desconhecido" in reasons
     # o resto foi gravado
-    assert body["created"] == 6
+    assert body["created"] == 7
+
+
+@pytest.mark.asyncio
+async def test_leilao_product_is_recognized(client: AsyncClient):
+    """produto=Leilão deve virar product_key='leilao', não cair em 'produto desconhecido'."""
+    body = (
+        await client.post(
+            "/api/admin/materials/import-csv",
+            files=_csv_upload(CSV_SAMPLE),
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    reasons = " ".join(e["reason"] for e in body["errors"])
+    assert "Leilão" not in reasons
+
+    listing = (await client.get("/api/admin/materials", headers=ADMIN_HEADERS)).json()
+    leilao_items = [m for m in listing["materials"] if m["product_key"] == "leilao"]
+    assert len(leilao_items) == 1
+    assert leilao_items[0]["label"] == "Edital Leilão"
+
+    public = (await client.get("/api/materials")).json()
+    keys = [p["key"] for p in public["products"]]
+    assert "leilao" in keys
+    # ordem canônica: leilao entre cimi_360 e indip
+    assert keys.index("cimi_360") < keys.index("leilao") < keys.index("indip")
 
 
 @pytest.mark.asyncio
