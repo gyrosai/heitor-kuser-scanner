@@ -1,3 +1,5 @@
+import pkg from '../../../package.json';
+
 interface FooterProps {
   onAbout?: () => void;
 }
@@ -26,6 +28,9 @@ export function Footer({ onAbout }: FooterProps) {
       >
         Gyros AI Solutions
       </a>
+      {/* Versão visível: permite perguntar "qual versão aparece aí?" e saber
+          na hora se o usuário está rodando o código atual */}
+      <p className="mt-2 text-[10px] text-text-subtle">v{pkg.version}</p>
     </div>
   );
 }

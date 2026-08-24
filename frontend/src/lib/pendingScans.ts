@@ -1,5 +1,5 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { ContactData } from "./types";
+import { getDB, newId } from "./db";
 
 export type ScanStatus =
   | "captured"
@@ -19,43 +19,9 @@ export interface PendingScan {
   uploading_at?: number;
 }
 
-interface ScansDB extends DBSchema {
-  pending_scans: {
-    key: string;
-    value: PendingScan;
-    indexes: { "by-status": ScanStatus };
-  };
-}
-
-const DB_NAME = "heitor_scanner_db";
-const DB_VERSION = 1;
+// A conexão com o IndexedDB é centralizada em db.ts (versão, upgrade e schema
+// dos stores vivem lá) — este módulo só opera sobre o store "pending_scans".
 const STORE = "pending_scans";
-
-let dbPromise: Promise<IDBPDatabase<ScansDB>> | null = null;
-
-function getDB(): Promise<IDBPDatabase<ScansDB>> {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("IndexedDB indisponível em SSR"));
-  }
-  if (!dbPromise) {
-    dbPromise = openDB<ScansDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE)) {
-          const store = db.createObjectStore(STORE, { keyPath: "id" });
-          store.createIndex("by-status", "status");
-        }
-      },
-    });
-  }
-  return dbPromise;
-}
-
-function newId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `scan_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-}
 
 function stripImage(scan: PendingScan): PendingScan {
   return { ...scan, image_base64: "" };

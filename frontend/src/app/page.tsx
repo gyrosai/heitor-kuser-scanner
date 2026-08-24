@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import * as Sentry from "@sentry/nextjs";
 import {
   ApiConflictError,
   ConflictError,
@@ -10,6 +11,7 @@ import {
 import type { GoogleAuthStatus } from "@/lib/api";
 import {
   EmailQuota,
+  NetworkError,
   checkGoogleStatus,
   connectGoogle,
   disconnectGoogle,
@@ -20,6 +22,8 @@ import {
 } from "@/lib/api";
 import type { EmailLanguage } from "@/lib/types";
 import { countByStatus } from "@/lib/pendingScans";
+import { countPendingSaves, enqueueSave } from "@/lib/pendingSaves";
+import { flushSaveQueue } from "@/lib/saveQueue";
 import { useToast } from "@/components/Toast";
 import SequenceCapture from "@/components/SequenceCapture";
 import CardCapture from "@/components/CardCapture";
@@ -103,6 +107,31 @@ export default function Home() {
     }
   }, [googleStatus.authenticated]);
 
+  // Erros no Sentry chegam identificados por usuário (Heitor? Henrique? Camila?)
+  useEffect(() => {
+    if (googleStatus.authenticated) {
+      Sentry.setUser({ email: googleStatus.user_email });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [googleStatus]);
+
+  // Gatilhos do retry da fila de saves: voltou conexão OU app abriu com
+  // pendências. Só com Google autenticado — senão todo flush morreria em 401.
+  useEffect(() => {
+    if (!googleStatus.authenticated) return;
+    const flush = () => {
+      void flushSaveQueue();
+    };
+    window.addEventListener("online", flush);
+    void (async () => {
+      try {
+        if (navigator.onLine && (await countPendingSaves()) > 0) flush();
+      } catch {}
+    })();
+    return () => window.removeEventListener("online", flush);
+  }, [googleStatus.authenticated]);
+
   useEffect(() => {
     checkGoogleStatus()
       .then((status) => setGoogleStatus(status))
@@ -147,8 +176,13 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Erro ao escanear cartão:", err);
+      Sentry.captureException(err, { tags: { flow: "card_capture" } });
       showToast(
-        err instanceof Error ? err.message : "Erro de conexão com o servidor",
+        err instanceof NetworkError && err.timedOut
+          ? "A análise demorou demais. Verifique sua conexão e tente de novo."
+          : err instanceof Error
+            ? err.message
+            : "Erro de conexão com o servidor",
         "error",
       );
       setState("home");
@@ -158,8 +192,24 @@ export default function Home() {
   const performSave = useCallback(
     async (editedContact: ContactData, force: boolean) => {
       setSaving(true);
+      Sentry.addBreadcrumb({
+        category: "save",
+        message: "save:start",
+        data: {
+          contactId,
+          hasEmail: !!editedContact.email,
+          sendEmail: editedContact.send_email,
+          online: typeof navigator !== "undefined" ? navigator.onLine : null,
+          force,
+        },
+      });
       try {
         await saveContact(editedContact, contactId ?? undefined, force, { downloadVCard: true });
+        Sentry.addBreadcrumb({
+          category: "save",
+          message: "save:success",
+          data: { contactId },
+        });
         if (editedContact.event_tag) {
           try {
             localStorage.setItem(LAST_EVENT_KEY, editedContact.event_tag);
@@ -175,11 +225,55 @@ export default function Home() {
         }, 1600);
       } catch (err) {
         if (err instanceof ApiConflictError) {
+          Sentry.addBreadcrumb({
+            category: "save",
+            message: "save:conflict",
+            data: { contactId, existing_id: err.conflict.existing_id },
+          });
           setConflict(err.conflict);
           setState("showing_duplicate");
           return;
         }
+        if (err instanceof NetworkError) {
+          // Falha de rede: NÃO é erro pro usuário — entra na fila local e o
+          // saveQueue reenvia sozinho quando voltar conexão.
+          Sentry.addBreadcrumb({
+            category: "save",
+            message: "save:queued",
+            data: { contactId, reason: err.message },
+          });
+          try {
+            await enqueueSave(editedContact, contactId ?? undefined);
+            showToast(
+              "Sem conexão com o servidor. Contato guardado no aparelho — reenviaremos automaticamente.",
+              "info",
+            );
+            setState("home");
+            setContact(null);
+            setContactId(null);
+            setConflict(null);
+            setCapturedDataUrl(null);
+          } catch (queueErr) {
+            // IndexedDB falhou (quota?): aí sim é erro de verdade
+            console.error("Erro ao enfileirar save:", queueErr);
+            Sentry.captureException(queueErr, {
+              tags: { flow: "enqueue_save" },
+            });
+            showToast(
+              "Sem conexão e não foi possível guardar localmente. Tente de novo.",
+              "error",
+            );
+          }
+          return;
+        }
+        Sentry.addBreadcrumb({
+          category: "save",
+          message: "save:error",
+          level: "error",
+          data: { contactId },
+        });
         console.error("Erro ao salvar contato:", err);
+        Sentry.captureException(err, { tags: { flow: "perform_save" } });
         showToast(
           err instanceof Error ? err.message : "Erro ao salvar contato",
           "error",
@@ -214,6 +308,10 @@ export default function Home() {
       setConflict(null);
     } catch (err) {
       console.error("Erro ao mesclar contato:", err);
+      Sentry.captureException(err, {
+        level: err instanceof NetworkError ? "warning" : "error",
+        tags: { flow: "merge_contact" },
+      });
       showToast(
         err instanceof Error ? err.message : "Erro ao atualizar contato",
         "error",

@@ -11,6 +11,7 @@ import { UserBar } from './UserBar';
 import { CimiLeadsWordmark } from './CimiLeadsWordmark';
 import { CaptureCard } from './CaptureCard';
 import { Footer } from './Footer';
+import { PendingSavesBanner } from './PendingSavesBanner';
 import { SearchInput } from './SearchInput';
 import { ContactListCard } from '@/components/contact/ContactListCard';
 
@@ -124,6 +125,9 @@ export function HomeScreen({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
+        {/* Saves que falharam por rede, aguardando reenvio automático */}
+        <PendingSavesBanner />
+
         {/* Capture modes */}
         <Section title="Escaneie um contato">
           <div className="flex flex-col gap-[10px]">
