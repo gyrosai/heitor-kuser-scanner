@@ -86,6 +86,18 @@ export default function ContactPreview({
     contact.email_language ?? "pt-BR"
   );
 
+  // O save tem timeout de 30s — se demorar mais que ~8s, avisa que ainda está
+  // trabalhando pra não deixar o usuário olhando um botão travado no escuro.
+  const [slowSave, setSlowSave] = useState(false);
+  useEffect(() => {
+    if (!saving) return;
+    const t = setTimeout(() => setSlowSave(true), 8000);
+    return () => {
+      clearTimeout(t);
+      setSlowSave(false);
+    };
+  }, [saving]);
+
   useEffect(() => {
     try {
       let stored = localStorage.getItem(LAST_EVENT_KEY);
@@ -124,12 +136,15 @@ export default function ContactPreview({
       email_language: emailLanguage,
     };
 
+    // Estes toasts falam SÓ do Mídia Kit — o save ainda nem aconteceu, então
+    // nada aqui pode dizer "salvo" ("Contato salvo!" só aparece na tela de
+    // sucesso, depois do backend confirmar).
     if (emailEnabled && quotaExhausted) {
-      showToast("Contato salvo. Envio do Mídia Kit indisponível (quota esgotada).", "info");
+      showToast("Mídia Kit não será enviado (limite diário atingido).", "info");
     } else if (emailEnabled && !online) {
       // TODO Fase 5C: ao voltar online, identificar contatos com email_status='skipped' recentes E preferência de
       //              envio originalmente true, e disparar retry. Requer 'queued' no backend pra ser semanticamente correto.
-      showToast("Contato salvo. Envio offline — tente enviar quando estiver online.", "info");
+      showToast("Sem conexão — o Mídia Kit não será enviado agora.", "info");
     }
 
     onSave(payload);
@@ -315,7 +330,11 @@ export default function ContactPreview({
           disabled={!form.name?.trim()}
           onClick={handleSave}
         >
-          {emailEnabled ? "Salvar e enviar Mídia Kit" : "Salvar contato"}
+          {saving && slowSave
+            ? "Ainda salvando... conexão lenta"
+            : emailEnabled
+              ? "Salvar e enviar Mídia Kit"
+              : "Salvar contato"}
         </Button>
         <Button variant="ghost" fullWidth size="sm" onClick={onReset}>
           Descartar e capturar outro

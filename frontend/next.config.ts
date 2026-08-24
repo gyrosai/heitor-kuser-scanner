@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   async rewrites() {
@@ -14,4 +15,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  // Upload de sourcemaps só acontece se SENTRY_AUTH_TOKEN existir no build;
+  // sem o token o build completa normal, só loga um warning.
+  widenClientFileUpload: true,
+  // SEM tunnelRoute: é a única opção do withSentryConfig que adiciona rewrites.
+  // Eventos vão direto pro DSN; as rewrites /api/* → BACKEND_URL ficam intactas.
+});
