@@ -9,7 +9,7 @@
         "testStrategy": "Add pytest coverage that GET /api/taxonomy returns the exact product order and all expected profiles. Add validator tests asserting every taxonomy tag is accepted and invalid tags return 422.",
         "priority": "high",
         "dependencies": [],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -78,7 +78,7 @@
         "complexity": 4,
         "recommendedSubtasks": 5,
         "expansionPrompt": "Break down the work into: define immutable taxonomy constants and derived allowed tags, implement the /api/taxonomy endpoint, wire validators to use the shared allowlist, handle legacy CIMI Invest read/validate exceptions, and add backend tests for ordering and validation.",
-        "updatedAt": "2026-08-24T17:30:51.023Z"
+        "updatedAt": "2026-08-24T20:34:09.876Z"
       },
       {
         "id": "12",
@@ -184,7 +184,7 @@
           "11",
           "12"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -256,7 +256,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Decompose into API client updates for taxonomy fetching/caching, editor component refactor, batch review carousel updates, history view compatibility, legacy CIMI Invest label rendering, and UI tests for ordering and persistence."
+        "expansionPrompt": "Decompose into API client updates for taxonomy fetching/caching, editor component refactor, batch review carousel updates, history view compatibility, legacy CIMI Invest label rendering, and UI tests for ordering and persistence.",
+        "updatedAt": "2026-08-24T20:34:09.880Z"
       },
       {
         "id": "14",
@@ -399,10 +400,8 @@
         "details": "Create the materials table with the PRD schema: id, product, group, label, language nullable, url, sort_order, active, meta jsonb, created_at. Implement GET/PUT-style admin endpoints and an idempotent CSV import endpoint keyed by (product, group, label, language). Accept the Henrique CSV layout, mark rows without URLs as inactive, and keep all operations guarded by X-Admin-Token from environment config. Pseudo-code: `upsert_material(unique_key, fields)`; `if not url: active=false`; `sort_order = provided_or_append`.",
         "testStrategy": "Add pytest coverage for CSV import idempotency, admin authentication, list/update/reorder behavior, and inactive-material handling. Verify duplicate rows update rather than create new records.",
         "priority": "medium",
-        "dependencies": [
-          "15"
-        ],
-        "status": "pending",
+        "dependencies": [],
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -410,9 +409,10 @@
             "description": "Design the materials table schema to match the PRD, including column types, nullable language, JSONB metadata, timestamps, and the uniqueness strategy needed for idempotent upserts.",
             "dependencies": [],
             "details": "Define the table columns id, product, group, label, language, url, sort_order, active, meta, and created_at. Specify indexes and a composite unique constraint on (product, group, label, language) to support idempotent import behavior and stable updates.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Validate the migration against an ephemeral database, confirm column types and constraints, and assert the unique key prevents duplicate records for the same material identity.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.799Z"
           },
           {
             "id": 2,
@@ -422,9 +422,10 @@
               1
             ],
             "details": "Write the migration for the new materials table, include defaults for active and sort_order where appropriate, and add any needed indexes for lookup and ordering. Ensure created_at is populated automatically and meta is stored as JSONB.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run migration up/down tests in CI and verify the resulting schema matches the expected structure and constraints in a fresh database.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.885Z"
           },
           {
             "id": 3,
@@ -435,9 +436,10 @@
               2
             ],
             "details": "Parse the Henrique CSV columns, normalize product/group/label/language/url values, and convert missing URLs into inactive records. Preserve unknown or extra CSV data inside meta when useful, and prepare records for deterministic upsert processing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Use fixture CSV files covering valid rows, missing URLs, blank language cells, and extra columns to confirm parsing and normalization behave correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.887Z"
           },
           {
             "id": 4,
@@ -449,9 +451,10 @@
               3
             ],
             "details": "Create a reusable upsert_material function that finds the material by the unique key, updates mutable fields, appends sort_order when not provided, and sets active to false when url is absent. Ensure conflicts resolve predictably and repeated imports produce the same final state.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Add tests that import the same CSV twice, verify row counts stay stable, and confirm existing rows are updated rather than duplicated when values change.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.922Z"
           },
           {
             "id": 5,
@@ -462,9 +465,10 @@
               2
             ],
             "details": "Check the incoming X-Admin-Token against the configured admin token before allowing list, read, update, reorder, or import operations. Return unauthorized responses consistently and keep the guard reusable across all admin routes.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Write API tests for missing, invalid, and valid admin tokens, confirming protected endpoints reject unauthorized requests and allow authorized ones.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.925Z"
           },
           {
             "id": 6,
@@ -475,9 +479,10 @@
               5
             ],
             "details": "Provide GET endpoints for list/read, PUT-style updates for editable fields, a CSV import endpoint, and a reorder endpoint that updates sort_order deterministically. Ensure list responses are ordered by sort_order and include active state plus metadata for admin usage.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create endpoint tests for list ordering, read-by-id, update persistence, reorder behavior, and import output, including checks that unauthorized requests are blocked.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.928Z"
           },
           {
             "id": 7,
@@ -490,14 +495,16 @@
               6
             ],
             "details": "Add tests that verify rows without URLs are marked inactive, duplicate CSV rows update existing materials, and conflicting updates preserve the unique identity constraints. Include cases for nullable language handling, sort_order append behavior, and mixed active/inactive imports.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Use pytest cases with CSV fixtures and direct API calls to validate inactive-item handling, conflict resolution, and stable ordering after repeated imports or edits.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-24T20:55:26.929Z"
           }
         ],
         "complexity": 8,
         "recommendedSubtasks": 7,
-        "expansionPrompt": "Split into schema design and migration, CSV import parser, idempotent upsert logic, admin authentication enforcement, CRUD/list/reorder API endpoints, inactive-item rules, and tests for import/update conflicts."
+        "expansionPrompt": "Split into schema design and migration, CSV import parser, idempotent upsert logic, admin authentication enforcement, CRUD/list/reorder API endpoints, inactive-item rules, and tests for import/update conflicts.",
+        "updatedAt": "2026-08-24T20:55:26.929Z"
       },
       {
         "id": "17",
@@ -510,7 +517,7 @@
           "15",
           "16"
         ],
-        "status": "pending",
+        "status": "deferred",
         "subtasks": [
           {
             "id": 1,
@@ -576,7 +583,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Decompose into page scaffolding, grouped materials data loading, edit/toggle/reorder controls, admin-authenticated API integration, shared cached client usage, and UI/integration tests."
+        "expansionPrompt": "Decompose into page scaffolding, grouped materials data loading, edit/toggle/reorder controls, admin-authenticated API integration, shared cached client usage, and UI/integration tests.",
+        "updatedAt": "2026-08-24T20:34:24.769Z"
       },
       {
         "id": "18",
@@ -1042,9 +1050,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-24T18:41:35.205Z",
+      "lastModified": "2026-08-24T20:55:26.929Z",
       "taskCount": 12,
-      "completedCount": 1,
+      "completedCount": 4,
       "tags": [
         "master"
       ]
