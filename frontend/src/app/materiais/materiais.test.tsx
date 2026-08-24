@@ -4,11 +4,18 @@ import MateriaisPage from "./page";
 import type { MaterialsResult } from "@/lib/materials";
 
 const getMaterialsCached = vi.fn();
+const checkGoogleStatus = vi.fn();
+const connectGoogle = vi.fn();
 
 vi.mock("@/lib/materials", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/lib/materials")>();
   return { ...mod, getMaterialsCached: () => getMaterialsCached() };
 });
+
+vi.mock("@/lib/api", () => ({
+  checkGoogleStatus: () => checkGoogleStatus(),
+  connectGoogle: () => connectGoogle(),
+}));
 
 const SAMPLE: MaterialsResult = {
   offline: false,
@@ -49,6 +56,10 @@ const SAMPLE: MaterialsResult = {
 
 beforeEach(() => {
   getMaterialsCached.mockReset();
+  checkGoogleStatus.mockReset();
+  connectGoogle.mockReset();
+  // Por padrão, usuário autenticado (gate liberado).
+  checkGoogleStatus.mockResolvedValue({ authenticated: true });
 });
 
 describe("MateriaisPage", () => {
@@ -85,6 +96,18 @@ describe("MateriaisPage", () => {
     await waitFor(() => {
       expect(screen.getByText("2 ativos")).toBeInTheDocument();
     });
+  });
+
+  it("sem login mostra a tela de login e não busca materiais", async () => {
+    checkGoogleStatus.mockResolvedValue({ authenticated: false });
+    getMaterialsCached.mockResolvedValue(SAMPLE);
+    render(<MateriaisPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Continuar com Google")).toBeInTheDocument();
+    });
+    expect(getMaterialsCached).not.toHaveBeenCalled();
+    expect(screen.queryByText("CIMI 360")).not.toBeInTheDocument();
   });
 
   it("lista vazia offline não quebra a tela", async () => {

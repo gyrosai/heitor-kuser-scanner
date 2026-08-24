@@ -9,6 +9,8 @@ import {
   type MaterialItem,
   type MaterialProduct,
 } from "@/lib/materials";
+import { checkGoogleStatus, connectGoogle } from "@/lib/api";
+import { LoginScreen } from "@/components/auth/LoginScreen";
 
 const LANGUAGE_LABELS: Record<string, string> = {
   PT: "PT",
@@ -115,8 +117,26 @@ export default function MateriaisPage() {
   const [products, setProducts] = useState<MaterialProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
+  // Gate de login: mesmo gate das demais telas. null = ainda verificando.
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    checkGoogleStatus()
+      .then((status) => {
+        if (mounted) setAuthed(status.authenticated);
+      })
+      .catch(() => {
+        if (mounted) setAuthed(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authed !== true) return;
     let mounted = true;
     getMaterialsCached()
       .then((res) => {
@@ -135,7 +155,28 @@ export default function MateriaisPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authed]);
+
+  // Enquanto verifica a sessão, evita piscar conteúdo/login.
+  if (authed === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-laranja-360 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <LoginScreen
+        onLogin={() => {
+          setAuthLoading(true);
+          connectGoogle(); // redireciona a página; authLoading fica no spinner do botão
+        }}
+        loading={authLoading}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-app-bg">
