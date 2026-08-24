@@ -332,9 +332,20 @@ export async function deleteContact(id: number): Promise<void> {
 export async function mergeContact(
   id: number,
   data: ContactData,
+  options?: {
+    /**
+     * id do draft (criado por /scan/card) que originou o conflito — o backend
+     * apaga a linha após o merge pra não deixar draft órfão no banco.
+     */
+    discardDraftId?: number;
+  },
 ): Promise<ContactRecord> {
+  const url = mkUrl(`/api/contacts/${id}/merge`);
+  if (options?.discardDraftId != null && options.discardDraftId !== id) {
+    url.searchParams.set("discard_draft_id", String(options.discardDraftId));
+  }
   const res = await doFetch(
-    `${API_URL}/api/contacts/${id}/merge`,
+    url.toString(),
     {
       method: "POST",
       credentials: "include",

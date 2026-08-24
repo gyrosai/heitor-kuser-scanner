@@ -121,7 +121,11 @@ export default function Home() {
   useEffect(() => {
     if (!googleStatus.authenticated) return;
     const flush = () => {
-      void flushSaveQueue();
+      void flushSaveQueue().then((result) => {
+        // contatos subiram: recarrega a listagem, senão ela fica stale até
+        // refresh manual da página
+        if (result.ok > 0) setHistoryKey((k) => k + 1);
+      });
     };
     window.addEventListener("online", flush);
     void (async () => {
@@ -294,7 +298,19 @@ export default function Home() {
     if (!conflict || !contact) return;
     setSaving(true);
     try {
-      await mergeContact(conflict.existing_id, contact);
+      // discardDraftId: o backend apaga o draft do /scan/card que originou o
+      // conflito — senão a linha fica órfã no banco pra sempre
+      await mergeContact(conflict.existing_id, contact, {
+        discardDraftId: contactId ?? undefined,
+      });
+      Sentry.addBreadcrumb({
+        category: "save",
+        message: "save:merged",
+        data: {
+          existing_id: conflict.existing_id,
+          discarded_draft_id: contactId ?? null,
+        },
+      });
       if (contact.event_tag) {
         try {
           localStorage.setItem(LAST_EVENT_KEY, contact.event_tag);
@@ -630,6 +646,7 @@ export default function Home() {
         quota={emailQuota}
         pendingCount={pendingCount}
         refreshKey={historyKey}
+        onSavesFlushed={() => setHistoryKey((k) => k + 1)}
         onScanCartao={() => setState("capturing_card")}
         onScanQR={() => setState("scanning_qr")}
         onScanSequence={() => setState(pendingCount > 0 ? "queue" : "sequence_capture")}

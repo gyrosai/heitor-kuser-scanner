@@ -106,12 +106,18 @@ async function flushOne(item: PendingSave): Promise<Outcome> {
       // No retry automático não dá pra perguntar ao usuário; merge é o
       // comportamento seguro: preserva dados dos dois lados sem duplicar.
       try {
-        await mergeContact(err.conflict.existing_id, item.contact);
+        await mergeContact(err.conflict.existing_id, item.contact, {
+          discardDraftId: item.contact_id,
+        });
         await deletePendingSave(item.id);
         Sentry.addBreadcrumb({
           category: "save_queue",
           message: "flush:merged",
-          data: { id: item.id, existing_id: err.conflict.existing_id },
+          data: {
+            id: item.id,
+            existing_id: err.conflict.existing_id,
+            discarded_draft_id: item.contact_id ?? null,
+          },
         });
         return "ok";
       } catch (mergeErr) {

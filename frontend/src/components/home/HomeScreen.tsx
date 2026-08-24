@@ -28,6 +28,7 @@ interface HomeScreenProps {
   quota: EmailQuota | null;
   pendingCount: number;
   refreshKey: number;
+  onSavesFlushed?: () => void;
   onScanCartao: () => void;
   onScanQR: () => void;
   onScanSequence: () => void;
@@ -41,6 +42,7 @@ export function HomeScreen({
   quota,
   pendingCount,
   refreshKey,
+  onSavesFlushed,
   onScanCartao,
   onScanQR,
   onScanSequence,
@@ -55,6 +57,7 @@ export function HomeScreen({
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadContacts = useCallback(async () => {
     setLoading(true);
@@ -65,13 +68,15 @@ export function HomeScreen({
         tags: filters.tags.length ? filters.tags : undefined,
       });
       setContacts(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch {
-      showToast('Erro ao carregar contatos', 'error');
-      setContacts([]);
+      // NÃO zera a lista: "0 contatos" seria mentira. Preserva o que já
+      // carregou e sinaliza o erro; o estado vazio+erro vira card de retry.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [filters, showToast]);
+  }, [filters]);
 
   useEffect(() => {
     loadContacts();
@@ -126,7 +131,7 @@ export function HomeScreen({
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         {/* Saves que falharam por rede, aguardando reenvio automático */}
-        <PendingSavesBanner />
+        <PendingSavesBanner onFlushed={onSavesFlushed} />
 
         {/* Capture modes */}
         <Section title="Escaneie um contato">
@@ -287,10 +292,39 @@ export function HomeScreen({
             </div>
           )}
 
+          {/* Aviso discreto quando o refresh falhou mas há lista anterior */}
+          {loadError && !loading && contacts.length > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-warning-border bg-warning-bg px-3 py-2">
+              <p className="text-[11px] text-warning-fg">
+                Não foi possível atualizar a lista.
+              </p>
+              <button
+                type="button"
+                onClick={() => void loadContacts()}
+                className="text-[11px] font-bold text-warning-fg underline shrink-0"
+              >
+                Tentar de novo
+              </button>
+            </div>
+          )}
+
           {/* Contact list */}
           {loading ? (
             <div className="rounded-2xl bg-white border border-border-default p-6 text-center text-text-subtle text-sm">
               Carregando...
+            </div>
+          ) : loadError && contacts.length === 0 ? (
+            <div className="rounded-2xl bg-white border border-border-default p-6 text-center">
+              <p className="text-sm text-text-muted">
+                Não foi possível carregar os contatos. Verifique sua conexão.
+              </p>
+              <button
+                type="button"
+                onClick={() => void loadContacts()}
+                className="mt-3 text-sm font-bold text-laranja-360 underline"
+              >
+                Tentar de novo
+              </button>
             </div>
           ) : filteredContacts.length === 0 ? (
             <div className="rounded-2xl bg-white border border-border-default p-6 text-center text-sm text-text-muted">

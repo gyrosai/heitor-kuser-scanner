@@ -703,6 +703,12 @@ async def list_contacts(
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
                 "has_image": has_image,
                 "email_language": getattr(c, "email_language", "pt-BR") or "pt-BR",
+                "google_contact_id": c.google_contact_id,
+                "email_status": getattr(c, "email_status", None),
+                "email_sent_at": c.email_sent_at.isoformat()
+                if getattr(c, "email_sent_at", None)
+                else None,
+                "email_error": getattr(c, "email_error", None),
             }
         )
     return out
@@ -849,10 +855,18 @@ async def merge_contact(
     contact_id: int,
     new_contact: ContactData,
     background_tasks: BackgroundTasks,
+    discard_draft_id: Optional[int] = None,
     db=Depends(get_db),
     current_user: CurrentUser | None = Depends(get_current_user_optional),
 ):
-    """Merge inteligente do contato existente com novo payload."""
+    """Merge inteligente do contato existente com novo payload.
+
+    discard_draft_id: id do draft (criado por /scan/card) que originou o
+    conflito. Após o merge, a linha é apagada — senão fica órfã pra sempre
+    (invisível na UI, que filtra is_draft=false). Só apaga se for realmente
+    draft e diferente do contato do merge; falha no descarte nunca derruba
+    o merge.
+    """
     if db is None:
         raise HTTPException(status_code=503, detail="Banco de dados não configurado")
 
@@ -902,6 +916,40 @@ async def merge_contact(
                 # Re-load attributes after second commit to avoid MissingGreenlet
                 # when _contact_to_dict accesses expired columns in async context.
                 await db.refresh(db_contact)
+
+        # ORDEM IMPORTA: o descarte do draft vem DEPOIS do agendamento da
+        # background task do e-mail. A task opera sobre db_contact.id (o
+        # existente), mas manter o descarte por último elimina qualquer corrida
+        # se código futuro passar a ler algo do draft. Não mover pra cima.
+        if discard_draft_id is not None and discard_draft_id != contact_id:
+            try:
+                draft_result = await db.execute(
+                    select(ScannedContact).where(
+                        ScannedContact.id == discard_draft_id,
+                        ScannedContact.is_draft.is_(True),
+                    )
+                )
+                draft = draft_result.scalar_one_or_none()
+                if draft is not None:
+                    await db.delete(draft)
+                    await db.commit()
+                    # commit expira atributos de db_contact — recarrega antes
+                    # do _contact_to_dict (mesmo motivo do refresh acima)
+                    await db.refresh(db_contact)
+                    logger.info(
+                        "Draft %s descartado após merge no contato %s",
+                        discard_draft_id,
+                        contact_id,
+                    )
+            except Exception as e:
+                # Descarte é secundário: nunca derruba o merge já commitado.
+                await db.rollback()
+                logger.warning(
+                    "Falha ao descartar draft %s após merge no contato %s: %s",
+                    discard_draft_id,
+                    contact_id,
+                    e,
+                )
 
         return _contact_to_dict(db_contact)
 

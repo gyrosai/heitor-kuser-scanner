@@ -11,9 +11,14 @@ import {
 } from "@/lib/pendingSaves";
 import { flushSaveQueue, isFlushAuthBlocked } from "@/lib/saveQueue";
 
+interface PendingSavesBannerProps {
+  /** Chamado quando o reenvio manual sobe pelo menos um contato */
+  onFlushed?: () => void;
+}
+
 // Banner persistente: contatos que falharam por rede e aguardam reenvio.
 // Não some sozinho — só quando a fila esvaziar de fato.
-export function PendingSavesBanner() {
+export function PendingSavesBanner({ onFlushed }: PendingSavesBannerProps) {
   const { showToast } = useToast();
   const [items, setItems] = useState<PendingSave[]>([]);
   const [flushing, setFlushing] = useState(false);
@@ -48,6 +53,7 @@ export function PendingSavesBanner() {
     setFlushing(true);
     try {
       const result = await flushSaveQueue();
+      if (result.ok > 0) onFlushed?.();
       if (result.skipped) {
         showToast("Reenvio já em andamento...", "info");
       } else if (result.authBlocked) {
