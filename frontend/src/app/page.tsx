@@ -63,7 +63,15 @@ type AppState =
   | "review_carousel"
   | "review_list";
 
-type SequenceEmailConfig = { sendKit: boolean; language: EmailLanguage; conflictStrategy: "replace" | "keep_both" | "ask" };
+type SequenceEmailConfig = {
+  sendKit: boolean;
+  language: EmailLanguage;
+  conflictStrategy: "replace" | "keep_both" | "ask";
+  /** Produto padrão do lote (null = legado, mídia kit fixo). */
+  defaultProduct: string | null;
+  /** Materiais pré-marcados para o produto padrão. */
+  defaultMaterialIds: number[];
+};
 
 export default function Home() {
   const { showToast } = useToast();
@@ -605,7 +613,7 @@ export default function Home() {
             setState("review_carousel");
           }}
           onSkip={() => {
-            setSequenceEmailConfig({ sendKit: false, language: "pt-BR", conflictStrategy: "replace" });
+            setSequenceEmailConfig({ sendKit: false, language: "pt-BR", conflictStrategy: "replace", defaultProduct: null, defaultMaterialIds: [] });
             setState("review_carousel");
           }}
           onBack={() => setState("queue")}
