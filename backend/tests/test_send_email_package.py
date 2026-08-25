@@ -199,32 +199,42 @@ async def test_legacy_path_still_attaches_media_kit_when_no_package():
 
 
 @pytest.mark.asyncio
-async def test_missing_template_fails_gracefully_never_raises():
-    """Produto sem template ativo: erro legível, contato continua salvo
-    (função não levanta exceção; save já ocorreu antes desta chamada)."""
+async def test_missing_template_uses_generic_fallback_and_still_sends():
+    """Produto sem template ativo: NUNCA impede o envio. compose_package usa
+    o texto genérico embutido por idioma e o e-mail sai normalmente."""
     contact = _make_contact()
     user = _make_user()
     db = _make_db(template=None, materials=[])
-    package = PackageSelection(product_key="leilao", material_ids=[])
+    package = PackageSelection(product_key="cimi_invest", material_ids=[])
 
-    with patch(
-        "app.services.email_dispatch.check_daily_quota",
-        return_value={
-            "remaining": 100,
-            "used": 0,
-            "limit": 500,
-            "sender_email": user.email,
-        },
+    with (
+        patch(
+            "app.services.email_dispatch.check_daily_quota",
+            return_value={
+                "remaining": 100,
+                "used": 0,
+                "limit": 500,
+                "sender_email": user.email,
+            },
+        ),
+        patch(
+            "app.services.email_dispatch.send_via_gmail",
+            new=AsyncMock(
+                return_value={"id": "gmail_fallback", "threadId": "thread_fallback"}
+            ),
+        ) as mock_send,
     ):
         result = await dispatch_media_kit_email(db, contact, user, package=package)
 
-    assert result.status == "failed"
-    assert "template ativo" in (result.error or "")
-    assert contact.email_status == "failed"
-    assert "template ativo" in (contact.email_error or "")
+    assert result.status == "sent"
+    assert contact.email_status == "sent"
+    assert contact.email_error is None
+
+    _, call_kwargs = mock_send.call_args
+    assert "foi um prazer" in call_kwargs["body_text"]
 
     logged = db.add.call_args.args[0]
-    assert logged.status == "failed"
+    assert logged.status == "sent"
 
 
 @pytest.mark.asyncio

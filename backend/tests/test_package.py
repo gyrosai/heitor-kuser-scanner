@@ -352,6 +352,74 @@ def test_subject_passthrough():
     assert result.subject == "Foi um prazer te conhecer no CIMI2026 — CIMI"
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Fallback de template ausente (regra: nunca impede o envio)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize(
+    "language,expected_snippet",
+    [
+        ("pt-BR", "foi um prazer"),
+        ("en", "pleasure"),
+        ("es", "placer"),
+    ],
+)
+def test_missing_template_body_uses_generic_fallback_by_language(
+    language, expected_snippet
+):
+    result = compose_package(
+        contact=FakeContact(name="Ana Souza", event_tag="CIMI2026"),
+        product_key="cimi_invest",
+        product_label="CIMI Invest",
+        language=language,
+        material_ids=[],
+        materials=[],
+        template_body=None,
+        subject="Assunto",
+    )
+    assert expected_snippet in result.text.lower()
+    assert "Ana" in result.text
+    assert "CIMI2026" in result.text
+    assert "{" not in result.text
+    assert "undefined" not in result.text.lower()
+    assert "template padrão usado" in result.warnings
+
+
+def test_blank_template_body_also_uses_generic_fallback():
+    result = compose_package(
+        contact=FakeContact(),
+        product_key="cimi_invest",
+        product_label="CIMI Invest",
+        language="pt-BR",
+        material_ids=[],
+        materials=[],
+        template_body="   ",
+        subject="Assunto",
+    )
+    assert "foi um prazer" in result.text
+    assert "template padrão usado" in result.warnings
+
+
+def test_missing_template_fallback_never_raises_and_still_lists_materials():
+    materials = _materials(
+        FakeMaterial(id=1, label="Kit", url="https://x/kit", product_key="cimi_invest")
+    )
+    result = compose_package(
+        contact=FakeContact(),
+        product_key="cimi_invest",
+        product_label="CIMI Invest",
+        language="pt-BR",
+        material_ids=[1],
+        materials=materials,
+        template_body=None,
+        subject="Assunto",
+    )
+    assert result.material_ids_used == [1]
+    assert "Kit — https://x/kit" in result.text
+    assert "template padrão usado" in result.warnings
+
+
 @pytest.mark.parametrize("language", ["pt-BR", "en", "es"])
 def test_universal_language_material_always_included(language):
     materials = _materials(FakeMaterial(id=1, label="Universal", language=None))
