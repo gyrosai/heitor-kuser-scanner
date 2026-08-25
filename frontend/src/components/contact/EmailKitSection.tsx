@@ -104,18 +104,17 @@ function PackageConfig({
     );
   };
 
-  const preview =
-    product && template
-      ? previewPackage({
-          contactName,
-          eventTag,
-          productLabel: product.label,
-          language: selectedLanguage,
-          materialIds: selectedMaterialIds,
-          materials: product.groups.flatMap((g) => g.items),
-          templateBody: template.body,
-        })
-      : null;
+  const preview = product
+    ? previewPackage({
+        contactName,
+        eventTag,
+        productLabel: product.label,
+        language: selectedLanguage,
+        materialIds: selectedMaterialIds,
+        materials: product.groups.flatMap((g) => g.items),
+        templateBody: template?.body ?? null,
+      })
+    : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -168,6 +167,12 @@ function PackageConfig({
             ))}
           </div>
         </Card>
+      )}
+
+      {preview?.usedGenericTemplate && (
+        <p className="text-xs text-warning-fg">
+          Este produto ainda não tem texto padrão — será usado o texto genérico.
+        </p>
       )}
 
       {preview && (

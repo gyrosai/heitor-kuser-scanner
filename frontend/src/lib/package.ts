@@ -22,6 +22,19 @@ const LANGUAGE_TO_MATERIAL_LANG: Record<EmailLanguage, string> = {
   es: "ESP",
 };
 
+/**
+ * Texto genérico embutido por idioma, usado quando o produto ainda não tem
+ * um MessageTemplate ativo — espelha
+ * `backend/app/services/package.py::DEFAULT_TEMPLATE_BODY`. A ausência de
+ * template NUNCA impede o preview/envio.
+ */
+export const DEFAULT_TEMPLATE_BODY: Record<EmailLanguage, string> = {
+  "pt-BR":
+    "Olá, {primeiro_nome}, foi um prazer estar com você no {evento}. Seguem os materiais:",
+  en: "Hello {primeiro_nome}, it was a pleasure having you at {evento}. Here are the materials:",
+  es: "Hola {primeiro_nome}, fue un placer contar con tu presencia en {evento}. Aquí tienes los materiales:",
+};
+
 const PLACEHOLDER_RE = /\{(nome|primeiro_nome|evento|produto)\}/g;
 
 export interface PackagePreviewInput {
@@ -32,7 +45,12 @@ export interface PackagePreviewInput {
   materialIds: number[];
   /** Catálogo candidato — itens do produto selecionado, em todos os idiomas. */
   materials: MaterialItem[];
-  templateBody: string;
+  /**
+   * Corpo do MessageTemplate do produto. `null`/vazio = produto sem
+   * template ativo — usa `DEFAULT_TEMPLATE_BODY[language]` e reporta em
+   * `warnings` (nunca bloqueia o preview).
+   */
+  templateBody?: string | null;
 }
 
 export interface PackagePreviewResult {
@@ -40,6 +58,8 @@ export interface PackagePreviewResult {
   html: string;
   warnings: string[];
   materialIdsUsed: number[];
+  /** true = o produto não tinha texto padrão; usou o texto genérico. */
+  usedGenericTemplate: boolean;
 }
 
 function renderPlaceholders(template: string, context: Record<string, string>): string {
@@ -126,10 +146,18 @@ export function previewPackage(input: PackagePreviewInput): PackagePreviewResult
     evento,
     produto: input.productLabel,
   };
-  const body = renderPlaceholders(input.templateBody, context);
+
+  const usedGenericTemplate = !input.templateBody || !input.templateBody.trim();
+  const bodySource = usedGenericTemplate
+    ? DEFAULT_TEMPLATE_BODY[input.language]
+    : (input.templateBody as string);
+  const body = renderPlaceholders(bodySource, context);
 
   const materialLang = LANGUAGE_TO_MATERIAL_LANG[input.language];
   const { included, warnings } = selectMaterials(input.materials, input.materialIds, materialLang);
+  if (usedGenericTemplate) {
+    warnings.push("template padrão usado");
+  }
 
   const lines = included.map((m) => `${materialLabel(m)} — ${m.url}`);
   const text = [body, lines.join("\n")].filter((p) => p).join("\n\n").trim();
@@ -154,6 +182,7 @@ export function previewPackage(input: PackagePreviewInput): PackagePreviewResult
     html,
     warnings,
     materialIdsUsed: included.map((m) => m.id),
+    usedGenericTemplate,
   };
 }
 

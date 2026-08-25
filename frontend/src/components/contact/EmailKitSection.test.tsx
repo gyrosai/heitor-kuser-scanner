@@ -179,6 +179,47 @@ describe("EmailKitSection — seletor de produto", () => {
   });
 });
 
+describe("EmailKitSection — produto sem template ativo", () => {
+  it("mostra aviso discreto e usa o texto genérico no preview, sem bloquear nada", () => {
+    render(
+      <EmailKitSection
+        {...baseProps()}
+        materialsData={MATERIALS}
+        templatesData={TEMPLATES}
+        selectedProduct="cimi_invest"
+        selectedMaterialIds={[]}
+      />,
+    );
+    // cimi_invest não tem template em TEMPLATES (só cimi_360 tem).
+    expect(
+      screen.getByText(
+        "Este produto ainda não tem texto padrão — será usado o texto genérico.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Ver preview do e-mail"));
+    expect(screen.getByText(/foi um prazer estar com você/)).toBeInTheDocument();
+
+    // Checkbox de envio continua habilitado — nada bloqueia o save.
+    expect(screen.getByText("Enviar pacote ao salvar")).toBeInTheDocument();
+  });
+
+  it("não mostra o aviso quando o produto já tem template", () => {
+    render(
+      <EmailKitSection
+        {...baseProps()}
+        materialsData={MATERIALS}
+        templatesData={TEMPLATES}
+        selectedProduct="cimi_360"
+        selectedMaterialIds={[]}
+      />,
+    );
+    expect(
+      screen.queryByText(/ainda não tem texto padrão/),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("EmailKitSection — preview", () => {
   it("preview colapsado por padrão; abre e mostra texto sem placeholder cru", () => {
     render(

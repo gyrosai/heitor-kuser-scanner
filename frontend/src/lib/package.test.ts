@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MATERIAL_LINKS, defaultMaterialIds, pickDefaultProduct, previewPackage } from "./package";
+import {
+  DEFAULT_TEMPLATE_BODY,
+  MAX_MATERIAL_LINKS,
+  defaultMaterialIds,
+  pickDefaultProduct,
+  previewPackage,
+} from "./package";
 import { MaterialItem } from "./materials";
+import { EmailLanguage } from "./types";
 
 function makeMaterial(overrides: Partial<MaterialItem> & { id: number; label: string }): MaterialItem {
   return {
@@ -218,6 +225,67 @@ describe("previewPackage — formatação", () => {
     expect(result.text).toBe("Só o corpo, sem materiais.");
     expect(result.materialIdsUsed).toEqual([]);
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("previewPackage — template ausente (fallback genérico)", () => {
+  it.each([
+    ["pt-BR", "prazer"],
+    ["en", "pleasure"],
+    ["es", "placer"],
+  ] as [EmailLanguage, string][])(
+    "usa DEFAULT_TEMPLATE_BODY[%s] quando templateBody é null e reporta usedGenericTemplate",
+    (language, snippet) => {
+      const result = previewPackage({
+        contactName: "Ana Souza",
+        eventTag: "CIMI2026",
+        productLabel: "CIMI Invest",
+        language,
+        materialIds: [],
+        materials: [],
+        templateBody: null,
+      });
+      expect(result.usedGenericTemplate).toBe(true);
+      expect(result.text.toLowerCase()).toContain(snippet);
+      expect(result.text).not.toContain("{");
+      expect(result.warnings).toContain("template padrão usado");
+    },
+  );
+
+  it("templateBody vazio/whitespace também usa o fallback genérico", () => {
+    const result = previewPackage({
+      contactName: "Ana Souza",
+      eventTag: "CIMI2026",
+      productLabel: "CIMI Invest",
+      language: "pt-BR",
+      materialIds: [],
+      materials: [],
+      templateBody: "   ",
+    });
+    expect(result.usedGenericTemplate).toBe(true);
+    expect(result.text).toBe(
+      "Olá, Ana, foi um prazer estar com você no CIMI2026. Seguem os materiais:",
+    );
+  });
+
+  it("templateBody presente não usa o fallback", () => {
+    const result = previewPackage({
+      productLabel: "CIMI 360",
+      language: "pt-BR",
+      materialIds: [],
+      materials: [],
+      templateBody: "Corpo customizado.",
+    });
+    expect(result.usedGenericTemplate).toBe(false);
+    expect(result.text).toBe("Corpo customizado.");
+    expect(result.warnings).not.toContain("template padrão usado");
+  });
+
+  it("DEFAULT_TEMPLATE_BODY cobre os 3 idiomas com o placeholder {evento}", () => {
+    (["pt-BR", "en", "es"] as EmailLanguage[]).forEach((language) => {
+      expect(DEFAULT_TEMPLATE_BODY[language]).toContain("{evento}");
+      expect(DEFAULT_TEMPLATE_BODY[language]).toContain("{primeiro_nome}");
+    });
   });
 });
 

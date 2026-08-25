@@ -26,6 +26,25 @@ MAX_MATERIAL_LINKS = 10
 # entram em qualquer idioma.
 LANGUAGE_TO_MATERIAL_LANG: dict[str, str] = {"pt-BR": "PT", "en": "ENG", "es": "ESP"}
 
+# Regra de produto: a ausência de template ativo NUNCA impede o envio. Quando
+# o produto ainda não tem um MessageTemplate cadastrado, ``compose_package``
+# usa este texto genérico embutido por idioma (mesmos placeholders do
+# template normal) e reporta em warnings — sem levantar exceção.
+DEFAULT_TEMPLATE_BODY: dict[str, str] = {
+    "pt-BR": (
+        "Olá, {primeiro_nome}, foi um prazer estar com você no {evento}. "
+        "Seguem os materiais:"
+    ),
+    "en": (
+        "Hello {primeiro_nome}, it was a pleasure having you at {evento}. "
+        "Here are the materials:"
+    ),
+    "es": (
+        "Hola {primeiro_nome}, fue un placer contar con tu presencia en "
+        "{evento}. Aquí tienes los materiales:"
+    ),
+}
+
 _PLACEHOLDER_RE = re.compile(r"\{(nome|primeiro_nome|evento|produto)\}")
 _MULTI_SPACE_RE = re.compile(r" {2,}")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r" +([.,!?;:])")
@@ -178,7 +197,7 @@ def compose_package(
     language: str,
     material_ids: list[int],
     materials: list[MaterialLike],
-    template_body: str,
+    template_body: str | None,
     subject: str,
 ) -> PackageResult:
     """Monta {subject, text, html, warnings} do e-mail de pacote.
@@ -195,6 +214,9 @@ def compose_package(
         materials: catálogo candidato (materiais do produto já carregados do
             DB pelo chamador — esta função não faz I/O).
         template_body: corpo do MessageTemplate do produto, com placeholders.
+            ``None``/vazio = produto sem template ativo — usa o texto
+            genérico embutido (``DEFAULT_TEMPLATE_BODY``) para o idioma do
+            envio e reporta em warnings. Nunca levanta exceção.
         subject: assunto já resolvido pelo chamador (reaproveita
             SUBJECTS[idioma] do pipeline legado).
     """
@@ -208,12 +230,23 @@ def compose_package(
         "evento": evento,
         "produto": product_label,
     }
-    body = _render_placeholders(template_body, context)
+
+    warnings: list[str] = []
+    if template_body and template_body.strip():
+        body_source = template_body
+    else:
+        body_source = DEFAULT_TEMPLATE_BODY.get(
+            language, DEFAULT_TEMPLATE_BODY["pt-BR"]
+        )
+        warnings.append("template padrão usado")
+
+    body = _render_placeholders(body_source, context)
 
     material_lang = LANGUAGE_TO_MATERIAL_LANG.get(language)
-    included, warnings = _select_materials(
+    included, material_warnings = _select_materials(
         materials, product_key, material_ids, material_lang
     )
+    warnings.extend(material_warnings)
 
     return PackageResult(
         subject=subject,

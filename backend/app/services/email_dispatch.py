@@ -34,11 +34,13 @@ class EmailDispatchResult(NamedTuple):
 
 async def _load_package_template(
     db, product_key: str, template_id: Optional[int]
-) -> MessageTemplate:
+) -> Optional[MessageTemplate]:
     """Busca o MessageTemplate ativo do produto (ou um id específico).
 
-    Levanta ValueError (mensagem legível) se não encontrar — o chamador
-    converte isso em email_status='failed' sem levantar exceção pro save.
+    Retorna None se não encontrar. Regra de produto: a ausência de template
+    NUNCA impede o envio — o chamador repassa ``None`` como ``template_body``
+    para ``compose_package``, que usa o texto genérico embutido por idioma
+    nesse caso (sem levantar exceção).
     """
     query = select(MessageTemplate).where(
         MessageTemplate.product_key == product_key,
@@ -47,12 +49,7 @@ async def _load_package_template(
     if template_id is not None:
         query = query.where(MessageTemplate.id == template_id)
     result = await db.execute(query)
-    template = result.scalars().first()
-    if template is None:
-        raise ValueError(
-            f"nenhum template ativo encontrado para o produto '{product_key}'"
-        )
-    return template
+    return result.scalars().first()
 
 
 async def _load_package_materials(db, material_ids: list[int]) -> list[Material]:
@@ -78,9 +75,10 @@ async def dispatch_media_kit_email(
     Atualiza os campos de rastreamento em ScannedContact (email_status, email_sent_at,
     email_language, email_gmail_message_id, email_error, email_attempted_at).
 
-    Uma falha na composição/envio do pacote (template ausente, OAuth expirado,
-    Gmail indisponível etc.) NUNCA propaga como exceção: cai no mesmo caminho
-    de email_status='failed' + erro legível, exatamente como o mídia kit legado.
+    Uma falha no envio do pacote (OAuth expirado, Gmail indisponível etc.)
+    NUNCA propaga como exceção: cai no mesmo caminho de email_status='failed'
+    + erro legível, exatamente como o mídia kit legado. Template ausente não
+    é mais uma falha: compose_package usa o texto genérico por idioma.
 
     Args:
         db: AsyncSession da request (ou sessão isolada em bg tasks).
@@ -197,7 +195,7 @@ async def dispatch_media_kit_email(
                 language=email_lang,
                 material_ids=package.material_ids,
                 materials=materials,
-                template_body=template.body,
+                template_body=template.body if template else None,
                 subject=subject,
             )
             body_text = composed.text
