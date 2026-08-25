@@ -6,6 +6,7 @@ import {
   type ConflictError,
   type ContactData,
   type Importance,
+  type PackageSelection,
 } from "@/lib/types";
 import { mergeContact, saveContact } from "@/lib/api";
 import {
@@ -22,13 +23,19 @@ import Field from "./Field";
 import StarRating from "./StarRating";
 import TagChips from "./TagChips";
 import ClassificacaoSection from "./contact/ClassificacaoSection";
+import PackagePicker from "./contact/PackagePicker";
+import PackagePreviewText from "./contact/PackagePreviewText";
 import { type ClassificacaoState, isInterestTag } from "@/lib/types";
 import { classificacoesToTags, tagsToClassificacoes } from "@/lib/taxonomy";
+import { defaultMaterialIds, pickDefaultProduct } from "@/lib/package";
+import { getMaterialsCached, getTemplatesCached, MaterialsPayload, TemplatesPayload } from "@/lib/materials";
 
 interface SequenceEmailConfig {
   sendKit: boolean;
   language: "pt-BR" | "en" | "es";
   conflictStrategy?: "replace" | "keep_both" | "ask";
+  defaultProduct: string | null;
+  defaultMaterialIds: number[];
 }
 
 interface ReviewCarouselProps {
@@ -42,6 +49,11 @@ interface ReviewItem {
   scan: PendingScan;
   form: ContactData;
   classificacao: ClassificacaoState;
+  /** Produto efetivo do item (null = legado). */
+  packageProduct: string | null;
+  packageMaterialIds: number[];
+  /** true = produto foi escolhido manualmente no card; false = derivado. */
+  packageOverride: boolean;
 }
 
 function scanToForm(scan: PendingScan, defaultEventTag: string | null): ContactData {
@@ -62,6 +74,19 @@ function scanToForm(scan: PendingScan, defaultEventTag: string | null): ContactD
   };
 }
 
+function buildItemPackage(
+  classificacao: ClassificacaoState,
+  defaultProduct: string | null,
+  materialsData: MaterialsPayload | null,
+  language: "pt-BR" | "en" | "es",
+): { product: string | null; materialIds: number[] } {
+  const productOrder = materialsData?.products.map((p) => p.key) ?? [];
+  const product = pickDefaultProduct(classificacao, productOrder) ?? defaultProduct;
+  if (!product || !materialsData) return { product: null, materialIds: [] };
+  const p = materialsData.products.find((pp) => pp.key === product);
+  return { product, materialIds: p ? defaultMaterialIds(p.groups, language) : [] };
+}
+
 export default function ReviewCarousel({
   startIndex = 0,
   sequenceEmailConfig = null,
@@ -80,6 +105,9 @@ export default function ReviewCarousel({
   const [replacedCount, setReplacedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [materialsData, setMaterialsData] = useState<MaterialsPayload | null>(null);
+  const [templatesData, setTemplatesData] = useState<TemplatesPayload | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -91,17 +119,38 @@ export default function ReviewCarousel({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const scans = await listPendingScans({
-        status: "processed",
-        includeImage: false,
-      });
+      const [scans, { materials }, { templates }] = await Promise.all([
+        listPendingScans({ status: "processed", includeImage: false }),
+        getMaterialsCached(),
+        getTemplatesCached(),
+      ]);
       if (cancelled) return;
+      setMaterialsData(materials);
+      setTemplatesData(templates);
+      const seq = sequenceEmailConfig ?? { sendKit: false, language: "pt-BR", conflictStrategy: "replace", defaultProduct: null, defaultMaterialIds: [] };
       const initial = scans.map((s) => {
         const form = scanToForm(s, null);
+        const classificacao = tagsToClassificacoes(form.tags);
+        const ext = s.extracted_data;
+        // Restaura package salvo anteriormente (reload ou navegação entre cards)
+        if (ext?.package) {
+          return {
+            scan: s,
+            form,
+            classificacao,
+            packageProduct: ext.package.product_key ?? null,
+            packageMaterialIds: ext.package.material_ids ?? [],
+            packageOverride: true,
+          };
+        }
+        const { product, materialIds } = buildItemPackage(classificacao, seq.defaultProduct, materials, seq.language);
         return {
           scan: s,
           form,
-          classificacao: tagsToClassificacoes(form.tags),
+          classificacao,
+          packageProduct: product,
+          packageMaterialIds: materialIds,
+          packageOverride: false,
         };
       });
       setItems(initial);
@@ -113,9 +162,25 @@ export default function ReviewCarousel({
     return () => {
       cancelled = true;
     };
-  }, [startIndex]);
+  }, [startIndex, sequenceEmailConfig]);
 
   const current = items[currentIndex];
+
+  // Se a classificação mudou e o produto NÃO era override manual, recalcular.
+  useEffect(() => {
+    if (!current || current.packageOverride || !materialsData) return;
+    const seq = sequenceEmailConfig ?? { sendKit: false, language: "pt-BR", conflictStrategy: "replace", defaultProduct: null, defaultMaterialIds: [] };
+    const { product, materialIds } = buildItemPackage(current.classificacao, seq.defaultProduct, materialsData, seq.language);
+    if (product !== current.packageProduct || materialIds.join(",") !== current.packageMaterialIds.join(",")) {
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === currentIndex
+            ? { ...it, packageProduct: product, packageMaterialIds: materialIds }
+            : it,
+        ),
+      );
+    }
+  }, [current, currentIndex, materialsData, sequenceEmailConfig]);
 
   // Carrega imagem do scan atual sob demanda.
   useEffect(() => {
@@ -133,6 +198,24 @@ export default function ReviewCarousel({
     };
   }, [current]);
 
+  // Persiste o estado do item (form + package) no extracted_data ao navegar
+  // entre cards ou ao salvar — garante que reload traz o mesmo package.
+  useEffect(() => {
+    return () => {
+      const item = items[currentIndex];
+      if (!item) return;
+      const packageSelection: PackageSelection | null = item.packageProduct
+        ? { product_key: item.packageProduct, material_ids: item.packageMaterialIds, template_id: null }
+        : null;
+      const data: ContactData = {
+        ...item.form,
+        tags: [...(item.form.tags ?? []).filter(isInterestTag), ...classificacoesToTags(item.classificacao)],
+        ...(packageSelection && { package: packageSelection }),
+      };
+      void updatePendingScan(item.scan.id, { extracted_data: data });
+    };
+  }, [currentIndex, items]);
+
   const updateForm = useCallback(
     <K extends keyof ContactData>(field: K, value: ContactData[K]) => {
       setItems((prev) =>
@@ -149,6 +232,19 @@ export default function ReviewCarousel({
       setItems((prev) =>
         prev.map((it, idx) =>
           idx === currentIndex ? { ...it, classificacao: next } : it,
+        ),
+      );
+    },
+    [currentIndex],
+  );
+
+  const updateItemPackage = useCallback(
+    (product: string | null, materialIds: number[], override: boolean) => {
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === currentIndex
+            ? { ...it, packageProduct: product, packageMaterialIds: materialIds, packageOverride: override }
+            : it,
         ),
       );
     },
@@ -213,6 +309,16 @@ export default function ReviewCarousel({
     setSaving(true);
     const classificationTags = classificacoesToTags(current.classificacao);
     const interestTags = (current.form.tags ?? []).filter(isInterestTag);
+
+    const packageSelection: PackageSelection | null =
+      current.packageProduct && sequenceEmailConfig?.sendKit
+        ? {
+            product_key: current.packageProduct,
+            material_ids: current.packageMaterialIds,
+            template_id: null,
+          }
+        : null;
+
     const payload: ContactData = {
       ...current.form,
       name: current.form.name.trim(),
@@ -222,6 +328,7 @@ export default function ReviewCarousel({
         send_email: sequenceEmailConfig.sendKit,
         email_language: sequenceEmailConfig.language,
       }),
+      ...(packageSelection && { package: packageSelection }),
     };
 
     const hasValidEmail = !!(
@@ -498,6 +605,42 @@ export default function ReviewCarousel({
           onChange={updateClassificacao}
         />
 
+        {/* Pacote de materiais por item */}
+        {sequenceEmailConfig?.sendKit && materialsData && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-text-muted">Pacote</span>
+                {current.packageProduct ? (
+                  <span className="inline-flex items-center rounded-full bg-azul-noturno px-2 py-0.5 text-[11px] font-bold text-white">
+                    {materialsData.products.find((p) => p.key === current.packageProduct)?.label ?? current.packageProduct}
+                  </span>
+                ) : (
+                  <span className="text-xs text-text-subtle">Mídia Kit fixo (legado)</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="text-xs font-semibold text-laranja-360 underline"
+              >
+                Alterar
+              </button>
+            </div>
+            {current.packageProduct && (
+              <PackagePreviewText
+                materialsData={materialsData}
+                templatesData={templatesData}
+                selectedProduct={current.packageProduct}
+                selectedMaterialIds={current.packageMaterialIds}
+                selectedLanguage={sequenceEmailConfig.language}
+                contactName={current.form.name}
+                eventTag={current.form.event_tag}
+              />
+            )}
+          </div>
+        )}
+
         <Field
           label="Observações"
           value={current.form.notes || ""}
@@ -566,6 +709,52 @@ export default function ReviewCarousel({
           </button>
         )}
       </div>
+
+      {/* Modal / drawer de override do pacote por item */}
+      {pickerOpen && materialsData && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white">
+          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3 flex items-center justify-between">
+            <p className="text-base font-semibold text-slate-800">Alterar pacote</p>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600"
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <PackagePicker
+              materialsData={materialsData}
+              templatesData={templatesData}
+              selectedProduct={current?.packageProduct ?? null}
+              onProductChange={(product) => {
+                const p = materialsData.products.find((pp) => pp.key === product);
+                const materialIds = p ? defaultMaterialIds(p.groups, sequenceEmailConfig?.language ?? "pt-BR") : [];
+                updateItemPackage(product, materialIds, true);
+              }}
+              selectedMaterialIds={current?.packageMaterialIds ?? []}
+              onMaterialIdsChange={(ids) => {
+                updateItemPackage(current?.packageProduct ?? null, ids, true);
+              }}
+              selectedLanguage={sequenceEmailConfig?.language ?? "pt-BR"}
+              contactName={current?.form.name}
+              eventTag={current?.form.event_tag}
+              hidePreview
+            />
+          </div>
+          <div className="border-t border-slate-200 bg-white px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(false)}
+              className="w-full rounded-xl bg-[#FA6801] py-3.5 text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

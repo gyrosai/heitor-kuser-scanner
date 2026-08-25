@@ -54,6 +54,8 @@ Também existe no editor a seção "Mídia kit por e-mail": checkbox "Enviar Mí
 | v0.3.0 | Resiliência: Sentry, timeouts, classificação de erro, fila de retry offline, banner de pendências, toast corrigido, "conexão lenta" após 8s | ✅ Produção (24/08) |
 | v0.3.1 | Listagem com campos de sync/e-mail, merge com `discard_draft_id`, lista preservada em falha de rede | ✅ Produção (24/08) |
 | Drafts | 45 drafts triados; 15 de 17 "leads" já existiam (órfãos de batch). Promovidos 361 (Assis), 363 (Yasser Hatia), 365 (Frederico Guidoni) | ✅ Feito |
+| 24/08 | Taxonomia 5 produtos, biblioteca de materiais (CSV), pacote por e-mail (individual) | ✅ Produção |
+| Modo batch | Pacote de materiais no modo batch: padrão por lote + override por item, preview colapsável, persistência via `extracted_data` | ✅ Este PR |
 
 **Bug crítico do evento de 14/08 — RESOLVIDO.** Causa raiz: `fetch` sem timeout em rede zumbi (conexão aceita, resposta nunca chega) → promise pendurada, botão travado em `saving=true`, zero request no backend. Não era OAuth, não era service worker, não era código novo.
 
@@ -81,6 +83,11 @@ Também existe no editor a seção "Mídia kit por e-mail": checkbox "Enviar Mí
 - Validators que filtram silenciosamente precisam ser atualizados junto com qualquer taxonomia nova (ou passar a retornar 422).
 - Nunca usar API não-oficial de WhatsApp. Envio é via `wa.me`.
 - **Taxonomia: editar só `shared/taxonomy.json` e rodar `python3 scripts/sync_taxonomy.py`.** `frontend/src/lib/taxonomy.json` e `backend/app/taxonomy.json` são cópias reais (não symlink) — o pre-commit hook `check-taxonomy-sync` bloqueia commit se alguma divergir.
+- Backend local: Python 3.11 (`uv venv --python 3.11`), `brew install zbar`, e `export DYLD_LIBRARY_PATH=/opt/homebrew/lib` para o pyzbar.
+- `package-lock.json` SEMPRE commitado junto com `package.json`.
+- Migration que altera tabela EXISTENTE roda ANTES do deploy (`create_all` não adiciona colunas).
+- `.env.example` só com placeholders; GitHub push protection bloqueia segredos.
+- Produto sem template usa texto genérico; ausência de dado nunca bloqueia save nem envio.
 
 ## 6. O que está sendo pedido agora (Henrique, mapa mental de 22/08)
 
