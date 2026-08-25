@@ -1049,13 +1049,30 @@
         "dependencies": [],
         "status": "pending",
         "subtasks": []
+      },
+      {
+        "id": "23",
+        "title": "Batch ReviewCarousel package selection and dispatch",
+        "description": "Implement batch mode for ReviewCarousel so each item uses the same product, language, and material selection rules as the individual flow, with sequence-level defaults in SequenceKitConfig and per-item overrides. Add batch endpoint support for a package payload per item, preselect materials by classification, and reuse the existing email dispatch pipeline.",
+        "details": "Extend the ReviewCarousel batch flow to consume a package configuration shaped consistently with the individual email kit flow: product, language, selected material IDs, and any preview metadata needed by the UI. Add SequenceKitConfig defaults for the batch context so a sequence can define the baseline product/language/material rules once, while allowing each item in the batch to override product, language, or package selection when explicitly provided.\n\nOn the frontend, update ReviewCarousel so it derives the initial selection state from the contact classification, using the same product auto-selection logic already used in the individual flow. When the contact has a single compatible product classification, preselect it automatically; otherwise keep the selector explicit. Apply the same language and material defaulting rules used by the existing package composer, including institutional materials and language-matching materials, but allow per-item overrides to persist independently for each batch row/card.\n\nOn the backend, update the batch endpoint to accept a package object per item rather than a single shared package for the whole request. Validate each item independently, resolve the effective package using item overrides first and SequenceKitConfig defaults second, then dispatch the email through the same send pipeline used for individual sends so sent history, status, timestamps, and error handling remain uniform. Preserve compatibility with existing batch requests by supporting fallback behavior when a package is omitted on an item and by rejecting malformed package shapes with clear validation errors.\n\nEnsure the batch preview and submit path use the shared package composition service so rendered content, placeholder handling, filtering of inactive or URL-less materials, and output consistency match the individual flow. Keep logging and error messages item-scoped so one invalid item does not obscure successful sends for other items in the same batch, unless the endpoint contract requires all-or-nothing semantics.",
+        "testStrategy": "Add backend tests that submit batch requests with mixed items: one using SequenceKitConfig defaults, one overriding product/language/materials, and one omitting package entirely to confirm fallback behavior. Verify that each item is validated independently, that the effective package matches the expected precedence rules, and that all successful items are recorded through the existing email send pipeline with correct sent history fields.\n\nAdd regression tests for classification-driven preselection, especially the single-classification case and the multi-classification case where the selector must remain explicit. Add UI tests for ReviewCarousel to confirm that item-level overrides do not leak across batch rows/cards and that the displayed preview matches the shared package composer output.\n\nAdd a test that exercises invalid package payloads per item and confirms the API returns structured validation errors without breaking valid items, or a predictable all-or-nothing failure if that is the chosen contract. Finally, verify that the batch endpoint produces the same rendered email body as the individual path for the same contact, product, language, and material set.",
+        "status": "done",
+        "dependencies": [
+          "12",
+          "15",
+          "18",
+          "19"
+        ],
+        "priority": "high",
+        "subtasks": [],
+        "updatedAt": "2026-08-25T13:16:24.825Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-24T22:56:37.326Z",
-      "taskCount": 12,
-      "completedCount": 7,
+      "lastModified": "2026-08-25T13:16:24.825Z",
+      "taskCount": 13,
+      "completedCount": 8,
       "tags": [
         "master"
       ]
