@@ -929,7 +929,7 @@
           "19",
           "20"
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1039,7 +1039,7 @@
         "complexity": 9,
         "recommendedSubtasks": 8,
         "expansionPrompt": "Split into import endpoint and dedup logic, duplicate detection expansion, CSV export changes, observability instrumentation, timeout-enabled frontend fetch adoption, Sentry breadcrumb wiring, environment/release guardrails, and end-to-end smoke tests.",
-        "updatedAt": "2026-08-25T17:48:44.294Z"
+        "updatedAt": "2026-08-26T05:09:49.946Z"
       },
       {
         "id": "22",
@@ -1072,9 +1072,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-25T17:48:44.295Z",
+      "lastModified": "2026-08-26T05:09:49.946Z",
       "taskCount": 13,
-      "completedCount": 8,
+      "completedCount": 9,
       "tags": [
         "master"
       ]
