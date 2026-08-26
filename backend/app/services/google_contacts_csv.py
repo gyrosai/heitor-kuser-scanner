@@ -5,7 +5,11 @@ import io
 import logging
 from dataclasses import dataclass
 
-from app.services.contact_normalize import email_normalize
+from app.services.contact_normalize import email_normalize, phone_to_e164
+
+# Separador que o Google usa para juntar vários valores na MESMA célula
+# (telefones, e-mails, sites, labels). Ex.: "+55 21 9... ::: +55 11 9...".
+MULTI_VALUE_SEPARATOR = " ::: "
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +20,12 @@ PERSONAL_LABELS = {"* family", "parente", "amigo"}
 GOOGLE_SYSTEM_LABELS = {"* mycontacts", "* starred", "importado em", "importado"}
 
 # Layouts suportados
-NEW_LAYOUT_HEADERS = {"First Name", "Last Name", "Organization Name", "Organization Title"}
+NEW_LAYOUT_HEADERS = {
+    "First Name",
+    "Last Name",
+    "Organization Name",
+    "Organization Title",
+}
 OLD_LAYOUT_HEADERS = {"Given Name", "Family Name", "Organization 1 - Name"}
 
 
@@ -27,9 +36,19 @@ class ContactImportRow:
     role: str | None
     phones: list[str]
     emails: list[str]
+    websites: list[str]
     notes: str | None
     labels: list[str]
     warnings: list[str]
+
+
+def _split_multi(val: str) -> list[str]:
+    """Divide uma célula que pode conter vários valores separados por
+    " ::: " (padrão do Google Contacts). Retorna itens não-vazios e já
+    isolados (strip). Uma célula com valor único vira lista de 1 elemento."""
+    if not val:
+        return []
+    return [p.strip() for p in val.split(MULTI_VALUE_SEPARATOR) if p.strip()]
 
 
 def _detect_layout(fieldnames: list[str]) -> str:
@@ -84,16 +103,16 @@ def _extract_emails(row: dict) -> list[str]:
     for key in sorted(k for k in row if k is not None):
         if key.startswith("E-mail") and key.endswith(" - Value"):
             val = row.get(key, "").strip()
-            if val:
-                norm = email_normalize(val)
+            for one in _split_multi(val):
+                norm = email_normalize(one)
                 if norm and norm not in emails:
                     emails.append(norm)
     # Layout antigo
     if not emails:
         for key in ("E-mail 1 - Value", "E-mail 2 - Value", "E-mail 3 - Value"):
             val = row.get(key, "").strip()
-            if val:
-                norm = email_normalize(val)
+            for one in _split_multi(val):
+                norm = email_normalize(one)
                 if norm and norm not in emails:
                     emails.append(norm)
     return emails
@@ -104,15 +123,43 @@ def _extract_phones(row: dict) -> list[str]:
     for key in sorted(k for k in row if k is not None):
         if key.startswith("Phone") and key.endswith(" - Value"):
             val = row.get(key, "").strip()
-            if val:
-                phones.append(val)
+            for one in _split_multi(val):
+                if one not in phones:
+                    phones.append(one)
     # Layout antigo
     if not phones:
         for key in ("Phone 1 - Value", "Phone 2 - Value", "Phone 3 - Value"):
             val = row.get(key, "").strip()
-            if val:
-                phones.append(val)
+            for one in _split_multi(val):
+                if one not in phones:
+                    phones.append(one)
+    # Coloca como primário o primeiro número que normaliza para E.164, para
+    # que `phones[0]` (gravado em `phone`) seja sempre um número isolado e
+    # coerente com `phone_e164`. Os demais vão para notes no parser.
+    for i, p in enumerate(phones):
+        if phone_to_e164(p):
+            if i > 0:
+                phones = [phones[i], *phones[:i], *phones[i + 1 :]]
+            break
     return phones
+
+
+def _extract_websites(row: dict) -> list[str]:
+    websites: list[str] = []
+    for key in sorted(k for k in row if k is not None):
+        if key.startswith("Website") and key.endswith(" - Value"):
+            val = row.get(key, "").strip()
+            for one in _split_multi(val):
+                if one not in websites:
+                    websites.append(one)
+    # Layout antigo
+    if not websites:
+        for key in ("Website 1 - Value", "Website 2 - Value", "Website 3 - Value"):
+            val = row.get(key, "").strip()
+            for one in _split_multi(val):
+                if one not in websites:
+                    websites.append(one)
+    return websites
 
 
 def _extract_company(row: dict, layout: str) -> str | None:
@@ -135,7 +182,7 @@ def _extract_labels(row: dict) -> list[str]:
     raw = row.get("Labels", "").strip()
     if not raw:
         return []
-    labels = [l.strip() for l in raw.split(" ::: ") if l.strip()]
+    labels = _split_multi(raw)
     return labels
 
 
@@ -185,6 +232,7 @@ def parse_google_contacts_csv(file_content: str) -> list[ContactImportRow]:
         import_labels = _filter_import_labels(labels)
         emails = _extract_emails(row)
         phones = _extract_phones(row)
+        websites = _extract_websites(row)
         name, name_is_fallback = _extract_name(row, layout)
         warnings: list[str] = []
 
@@ -195,15 +243,20 @@ def parse_google_contacts_csv(file_content: str) -> list[ContactImportRow]:
         role = _extract_role(row, layout)
         notes = _extract_notes(row)
 
-        # Adiciona outros contatos em notes
-        extra_emails = emails[1:]
+        # Adiciona outros contatos em notes. O primário (index 0) já vai para
+        # as colunas phone/email/website; os demais ficam registrados aqui em
+        # vez de serem descartados.
         extra_phones = phones[1:]
-        if extra_emails or extra_phones:
+        extra_emails = emails[1:]
+        extra_websites = websites[1:]
+        if extra_phones or extra_emails or extra_websites:
             extras: list[str] = []
-            if extra_emails:
-                extras.append(f"Outros emails: {', '.join(extra_emails)}")
             if extra_phones:
                 extras.append(f"Outros telefones: {', '.join(extra_phones)}")
+            if extra_emails:
+                extras.append(f"Outros e-mails: {', '.join(extra_emails)}")
+            if extra_websites:
+                extras.append(f"Outros sites: {', '.join(extra_websites)}")
             extra_note = "\n".join(extras)
             if notes:
                 notes = f"{notes}\n{extra_note}"
@@ -225,6 +278,7 @@ def parse_google_contacts_csv(file_content: str) -> list[ContactImportRow]:
                 role=role,
                 phones=phones,
                 emails=emails,
+                websites=websites,
                 notes=notes,
                 labels=import_labels,
                 warnings=warnings,
