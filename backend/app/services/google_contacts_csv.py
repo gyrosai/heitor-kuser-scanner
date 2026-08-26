@@ -4,9 +4,8 @@ import csv
 import io
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
-from app.services.contact_normalize import email_normalize, phone_to_e164
+from app.services.contact_normalize import email_normalize
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +23,11 @@ OLD_LAYOUT_HEADERS = {"Given Name", "Family Name", "Organization 1 - Name"}
 @dataclass
 class ContactImportRow:
     name: str
-    company: Optional[str]
-    role: Optional[str]
+    company: str | None
+    role: str | None
     phones: list[str]
     emails: list[str]
-    notes: Optional[str]
+    notes: str | None
     labels: list[str]
     warnings: list[str]
 
@@ -42,7 +41,14 @@ def _detect_layout(fieldnames: list[str]) -> str:
     return "unknown"
 
 
-def _extract_name(row: dict, layout: str) -> str:
+def _extract_name(row: dict, layout: str) -> tuple[str, bool]:
+    """Retorna (nome, usou_fallback).
+
+    `usou_fallback=True` quando o nome não veio dos campos reais de nome
+    (First/Last Name ou Given/Family Name) — ou seja, veio de File As,
+    Organization Name, e-mail, telefone ou "Sem nome". Usado para decidir se
+    emite o warning de "nome ausente".
+    """
     if layout == "new":
         parts = [
             row.get("First Name", "").strip(),
@@ -51,12 +57,12 @@ def _extract_name(row: dict, layout: str) -> str:
         ]
         name = " ".join(p for p in parts if p)
         if name:
-            return name
+            return name, False
         # Fallbacks
         for key in ("File As", "Organization Name"):
             val = row.get(key, "").strip()
             if val:
-                return val
+                return val, True
     elif layout == "old":
         parts = [
             row.get("Given Name", "").strip(),
@@ -64,16 +70,18 @@ def _extract_name(row: dict, layout: str) -> str:
         ]
         name = " ".join(p for p in parts if p)
         if name:
-            return name
+            return name, False
     # Último fallback: e-mail ou telefone
-    email = _extract_emails(row)[0]
-    phone = _extract_phones(row)[0]
-    return email or phone or "Sem nome"
+    emails = _extract_emails(row)
+    phones = _extract_phones(row)
+    email = emails[0] if emails else None
+    phone = phones[0] if phones else None
+    return (email or phone or "Sem nome"), True
 
 
 def _extract_emails(row: dict) -> list[str]:
     emails: list[str] = []
-    for key in sorted(k for k in row.keys() if k is not None):
+    for key in sorted(k for k in row if k is not None):
         if key.startswith("E-mail") and key.endswith(" - Value"):
             val = row.get(key, "").strip()
             if val:
@@ -93,7 +101,7 @@ def _extract_emails(row: dict) -> list[str]:
 
 def _extract_phones(row: dict) -> list[str]:
     phones: list[str] = []
-    for key in sorted(k for k in row.keys() if k is not None):
+    for key in sorted(k for k in row if k is not None):
         if key.startswith("Phone") and key.endswith(" - Value"):
             val = row.get(key, "").strip()
             if val:
@@ -107,19 +115,19 @@ def _extract_phones(row: dict) -> list[str]:
     return phones
 
 
-def _extract_company(row: dict, layout: str) -> Optional[str]:
+def _extract_company(row: dict, layout: str) -> str | None:
     if layout == "new":
         return row.get("Organization Name", "").strip() or None
     return row.get("Organization 1 - Name", "").strip() or None
 
 
-def _extract_role(row: dict, layout: str) -> Optional[str]:
+def _extract_role(row: dict, layout: str) -> str | None:
     if layout == "new":
         return row.get("Organization Title", "").strip() or None
     return row.get("Organization 1 - Title", "").strip() or None
 
 
-def _extract_notes(row: dict) -> Optional[str]:
+def _extract_notes(row: dict) -> str | None:
     return row.get("Notes", "").strip() or None
 
 
@@ -133,9 +141,7 @@ def _extract_labels(row: dict) -> list[str]:
 
 def _should_skip(labels: list[str]) -> bool:
     lower = {l.lower() for l in labels}
-    if PERSONAL_LABELS & lower:
-        return True
-    return False
+    return bool(PERSONAL_LABELS & lower)
 
 
 def _filter_import_labels(labels: list[str]) -> list[str]:
@@ -158,8 +164,7 @@ def parse_google_contacts_csv(file_content: str) -> list[ContactImportRow]:
     Retorna lista de ContactImportRow; contatos pessoais são omitidos.
     """
     # Remove BOM se houver
-    if file_content.startswith("\ufeff"):
-        file_content = file_content[1:]
+    file_content = file_content.removeprefix("\ufeff")
 
     reader = csv.DictReader(io.StringIO(file_content))
     if not reader.fieldnames:
@@ -180,10 +185,10 @@ def parse_google_contacts_csv(file_content: str) -> list[ContactImportRow]:
         import_labels = _filter_import_labels(labels)
         emails = _extract_emails(row)
         phones = _extract_phones(row)
-        name = _extract_name(row, layout)
+        name, name_is_fallback = _extract_name(row, layout)
         warnings: list[str] = []
 
-        if not name or name == "Sem nome":
+        if name_is_fallback:
             warnings.append("nome ausente; usado email/telefone como provisório")
 
         company = _extract_company(row, layout)

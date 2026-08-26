@@ -72,20 +72,45 @@ def _make_log(
     return log
 
 
-def _db_for_list_contacts(contact_rows, logs):
-    """db.execute é chamado 3x: (1) count, (2) query de contatos, (3) query de email_logs."""
-    count_result = MagicMock()
-    count_result.scalar.return_value = len(contact_rows)
+def _db_for_list_contacts(contact_rows, logs, include_imported=False):
+    """Mocka db.execute na ordem chamada por list_contacts.
 
+    - include_imported=False (contrato padrão/atual): (1) query de contatos,
+      (2) query de email_logs — SEM count, pois o formato de retorno é uma
+      lista simples e não precisa de total para paginação.
+    - include_imported=True: (1) count, (2) query de contatos, (3) email_logs.
+    """
     contacts_result = MagicMock()
     contacts_result.all.return_value = contact_rows
 
     logs_result = MagicMock()
     logs_result.scalars.return_value.all.return_value = logs
 
+    side_effect = [contacts_result, logs_result]
+    if include_imported:
+        count_result = MagicMock()
+        count_result.scalar.return_value = len(contact_rows)
+        side_effect = [count_result, contacts_result, logs_result]
+
     db = AsyncMock()
-    db.execute = AsyncMock(side_effect=[count_result, contacts_result, logs_result])
+    db.execute = AsyncMock(side_effect=side_effect)
     return db
+
+
+@pytest.mark.asyncio
+async def test_list_contacts_default_returns_plain_array():
+    """Contrato atual (sem include_imported): resposta é list[ContactRecord],
+    não {"contacts": ..., "total": ...} — o frontend em produção depende
+    disso hoje. Não pode regredir."""
+    c1 = _make_contact(1)
+    db = _db_for_list_contacts([(c1, False)], [])
+
+    out = await list_contacts(db=db, tags=None)
+
+    assert isinstance(out, list)
+    assert out[0]["id"] == 1
+    # sem include_imported: só 2 chamadas (contatos + email_logs), sem count
+    assert db.execute.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -100,10 +125,9 @@ async def test_list_contacts_includes_last_send_for_each_contact():
     ]
     db = _db_for_list_contacts([(c1, False), (c2, False)], logs)
 
-    out = await list_contacts(db=db, tags=None, limit=200)
+    out = await list_contacts(db=db, tags=None)
 
-    contacts = out["contacts"]
-    by_id = {c["id"]: c for c in contacts}
+    by_id = {c["id"]: c for c in out}
     assert by_id[1]["last_send"] == {
         "channel": "email",
         "product_key": "cimi_360",
@@ -116,10 +140,25 @@ async def test_list_contacts_includes_last_send_for_each_contact():
 @pytest.mark.asyncio
 async def test_list_contacts_no_contacts_skips_email_logs_query():
     db = _db_for_list_contacts([], [])
-    out = await list_contacts(db=db, tags=None, limit=200)
-    assert out == {"contacts": [], "total": 0}
-    # 1 chamada (count) + 1 chamada (contatos) = 2; sem contact_ids, não consulta email_logs
-    assert db.execute.await_count == 2
+    out = await list_contacts(db=db, tags=None)
+    assert out == []
+    # só 1 chamada (contatos); sem contact_ids, não consulta email_logs
+    assert db.execute.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_list_contacts_include_imported_returns_dict_with_total():
+    """include_imported=true muda o contrato para {"contacts", "total"} —
+    usado pelo toggle "Base Heitor" no frontend, que pagina via `limit`."""
+    c1 = _make_contact(1, source="base_heitor")
+    db = _db_for_list_contacts([(c1, False)], [], include_imported=True)
+
+    out = await list_contacts(db=db, tags=None, include_imported=True, limit=200)
+
+    assert out["total"] == 1
+    assert out["contacts"][0]["id"] == 1
+    # include_imported=true: 3 chamadas (count + contatos + email_logs)
+    assert db.execute.await_count == 3
 
 
 @pytest.mark.asyncio

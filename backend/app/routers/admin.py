@@ -1,55 +1,30 @@
 from __future__ import annotations
 
-import csv
-import io
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
-from sqlalchemy import and_, func, or_, select
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.db_models import ScannedContact
+from app.dependencies import require_admin_token
 from app.services.contact_normalize import email_normalize, phone_to_e164
-from app.services.google_contacts_csv import ContactImportRow, parse_google_contacts_csv
+from app.services.google_contacts_csv import parse_google_contacts_csv
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin")
 
-# Token simples via header — substituir por algo mais robusto se necessário
-ADMIN_TOKEN = "heitor-import-2024"  # placeholder; usar env var em produção
 
-
-async def _verify_admin_token(x_admin_token: str = Header(..., alias="X-Admin-Token")) -> None:
-    if x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-
-def _is_imported_duplicate(
-    row: ContactImportRow, existing: ScannedContact
-) -> bool:
-    """Verifica se um contato importado já existe (por phone_e164 ou email_norm)."""
-    if row.emails and existing.email_norm:
-        for email in row.emails:
-            if email_normalize(email) == existing.email_norm:
-                return True
-    if row.phones and existing.phone_e164:
-        for phone in row.phones:
-            norm = phone_to_e164(phone)
-            if norm and norm == existing.phone_e164:
-                return True
-    return False
-
-
-@router.post("/contacts/import-google-csv")
+@router.post(
+    "/contacts/import-google-csv", dependencies=[Depends(require_admin_token)]
+)
 async def import_google_contacts_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_verify_admin_token),
 ) -> dict:
     """Importa contatos do Google Contacts CSV para scanned_contacts.
 
@@ -81,8 +56,8 @@ async def import_google_contacts_csv(
     existing_result = await db.execute(
         select(ScannedContact.id, ScannedContact.phone_e164, ScannedContact.email_norm)
     )
-    existing_by_phone: dict[str, int] = {}
-    existing_by_email: dict[str, int] = {}
+    existing_by_phone: dict[str, int | None] = {}
+    existing_by_email: dict[str, int | None] = {}
     for row_id, phone_e164, email_norm in existing_result.all():
         if phone_e164:
             existing_by_phone[phone_e164] = row_id
@@ -130,6 +105,15 @@ async def import_google_contacts_csv(
             if len(skipped_details) < 20:
                 skipped_details.append({"line": idx, "existing_id": dup_id, "reason": "duplicado"})
             continue
+
+        # Registra a chave normalizada IMEDIATAMENTE (antes do commit em lote)
+        # para pegar duplicatas dentro do PRÓPRIO arquivo — sem isso, duas
+        # linhas iguais no mesmo CSV só seriam deduplicadas quando caíssem em
+        # lotes (commits) diferentes, criando duplicatas reais no banco.
+        if phone_e164:
+            existing_by_phone[phone_e164] = None
+        if email_norm_val:
+            existing_by_email[email_norm_val] = None
 
         if dry_run:
             created += 1

@@ -32,6 +32,15 @@ class ScannedContact(Base):
     notes = Column(Text, nullable=True)
     source = Column(String(20), default="card_photo")
     event_tag = Column(String(100), nullable=True)
+
+    # ── Dedup / import (migration 012) ───────────────────────────────────────
+    # phone_e164/email_norm: valores normalizados usados para dedup (contra
+    # scans, saves manuais e a base importada do Google). import_labels:
+    # marcadores originais do Google Contacts preservados em contatos
+    # source='base_heitor' (informativo; não usado para lógica).
+    phone_e164 = Column(String(32), nullable=True, index=True)
+    email_norm = Column(String(255), nullable=True, index=True)
+    import_labels = Column(ARRAY(String), nullable=False, server_default="{}")
     scanned_at = Column(DateTime(timezone=True), server_default=func.now())
     raw_qr_data = Column(Text, nullable=True)
     google_contact_id = Column(String(255), nullable=True)

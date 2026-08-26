@@ -734,12 +734,15 @@ async def list_contacts(
 ):
     """Lista contatos salvos no banco (não-draft por padrão).
 
-    - include_imported=false (default): exclui source='base_heitor'.
-    - include_imported=true: inclui importados; limit 200 (max 500) aplicado.
+    - include_imported=false (default): exclui source='base_heitor'; resposta
+      é uma lista simples (`list[ContactRecord]`), igual ao contrato anterior
+      — o frontend atual (sem toggle de base importada) depende disso.
+    - include_imported=true: inclui importados; aplica `limit` (padrão 200,
+      máx 500) e retorna `{"contacts": [...], "total": N}` para paginação.
     - search: busca em nome, empresa e email.
     """
     if db is None:
-        return {"error": "Banco de dados não configurado", "contacts": [], "total": 0}
+        return {"error": "Banco de dados não configurado", "contacts": []}
 
     filters = []
     if not include_drafts:
@@ -773,14 +776,19 @@ async def list_contacts(
     if filters:
         base_query = base_query.where(and_(*filters))
 
-    # Total (sem limit) para paginação
-    count_query = select(func.count()).select_from(ScannedContact)
-    if filters:
-        count_query = count_query.where(and_(*filters))
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
+    # Total (sem limit) só é calculado quando include_imported=true — é o
+    # único caminho que pagina/limita e precisa do total para o frontend.
+    total: Optional[int] = None
+    if include_imported:
+        count_query = select(func.count()).select_from(ScannedContact)
+        if filters:
+            count_query = count_query.where(and_(*filters))
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0
+        query = base_query.limit(limit)
+    else:
+        query = base_query
 
-    query = base_query.limit(limit)
     result = await db.execute(query)
     rows = result.all()
 
@@ -836,7 +844,9 @@ async def list_contacts(
                 "import_labels": list(c.import_labels or []),
             }
         )
-    return {"contacts": out, "total": total}
+    if include_imported:
+        return {"contacts": out, "total": total}
+    return out
 
 
 @router.patch("/contacts/{contact_id}")
