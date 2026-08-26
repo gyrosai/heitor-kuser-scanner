@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import defer
 
 from app.database import async_session, get_db
@@ -28,8 +28,18 @@ from app.models import (
     SendEmailRequest,
     SendEmailResponse,
 )
-from app.taxonomy import format_csv_columns, get_taxonomy_payload, parse_classification_tags
-from app.services import image_service, ocr_service, qrcode_service, vcard_service
+from app.services import (
+    contact_normalize,
+    image_service,
+    ocr_service,
+    qrcode_service,
+    vcard_service,
+)
+from app.taxonomy import (
+    format_csv_columns,
+    get_taxonomy_payload,
+    parse_classification_tags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +80,7 @@ def _contact_to_dict(c: ScannedContact, include_image_flag: bool = True) -> dict
         "email_status": getattr(c, "email_status", None),
         "email_sent_at": c.email_sent_at.isoformat() if getattr(c, "email_sent_at", None) else None,
         "email_error": getattr(c, "email_error", None),
+        "import_labels": list(getattr(c, "import_labels", []) or []),
     }
     if include_image_flag:
         # has_image só está disponível se card_image foi carregado;
@@ -111,7 +122,9 @@ async def _save_contact(
         db_contact = ScannedContact(
             name=contact.name,
             phone=contact.phone,
+            phone_e164=contact_normalize.phone_to_e164(contact.phone),
             email=contact.email,
+            email_norm=contact_normalize.email_normalize(contact.email),
             company=contact.company,
             role=contact.role,
             website=contact.website,
@@ -293,7 +306,6 @@ async def create_vcard(
                     )
                 )
             if email_or_phone:
-                from sqlalchemy import or_
 
                 dup_query = (
                     select(ScannedContact)
@@ -309,12 +321,62 @@ async def create_vcard(
                             "existing": _contact_to_pydantic(dup).model_dump(),
                             "existing_id": dup.id,
                             "new": contact.model_dump(),
+                            "match_type": "scanned",
                         },
                     )
 
+            # ── 2ª checagem: dedup contra importados (base_heitor) — ignora event_tag ──
+            if not force:
+                imported_conflict = []
+                if contact.email:
+                    email_norm = contact_normalize.email_normalize(contact.email)
+                    if email_norm:
+                        imported_conflict.append(
+                            and_(
+                                ScannedContact.email_norm.isnot(None),
+                                ScannedContact.email_norm == email_norm,
+                            )
+                        )
+                if contact.phone:
+                    phone_e164 = contact_normalize.phone_to_e164(contact.phone)
+                    if phone_e164:
+                        imported_conflict.append(
+                            and_(
+                                ScannedContact.phone_e164.isnot(None),
+                                ScannedContact.phone_e164 == phone_e164,
+                            )
+                        )
+                if imported_conflict:
+
+                    imported_query = (
+                        select(ScannedContact)
+                        .where(
+                            and_(
+                                ScannedContact.id != contact_id,
+                                ScannedContact.source == "base_heitor",
+                                or_(*imported_conflict),
+                            )
+                        )
+                        .limit(1)
+                    )
+                    imported_result = await db.execute(imported_query)
+                    imported_dup = imported_result.scalar_one_or_none()
+                    if imported_dup is not None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail={
+                                "existing": _contact_to_pydantic(imported_dup).model_dump(),
+                                "existing_id": imported_dup.id,
+                                "new": contact.model_dump(),
+                                "match_type": "imported",
+                            },
+                        )
+
         db_contact.name = contact.name
         db_contact.phone = contact.phone
+        db_contact.phone_e164 = contact_normalize.phone_to_e164(contact.phone)
         db_contact.email = contact.email
+        db_contact.email_norm = contact_normalize.email_normalize(contact.email)
         db_contact.company = contact.company
         db_contact.role = contact.role
         db_contact.website = contact.website
@@ -334,7 +396,6 @@ async def create_vcard(
         # direto como não-draft. Quando o frontend novo (PR 2) chegar, ele
         # sempre manda contact_id e este branch não é mais usado.
         from datetime import timedelta
-        from sqlalchemy import or_
 
         draft_window = datetime.now(timezone.utc) - timedelta(minutes=5)
         promote_filters = [
@@ -361,7 +422,9 @@ async def create_vcard(
         if promoted is not None:
             promoted.name = contact.name
             promoted.phone = contact.phone
+            promoted.phone_e164 = contact_normalize.phone_to_e164(contact.phone)
             promoted.email = contact.email
+            promoted.email_norm = contact_normalize.email_normalize(contact.email)
             promoted.company = contact.company
             promoted.role = contact.role
             promoted.website = contact.website
@@ -383,7 +446,9 @@ async def create_vcard(
             db_contact = ScannedContact(
                 name=contact.name,
                 phone=contact.phone,
+                phone_e164=contact_normalize.phone_to_e164(contact.phone),
                 email=contact.email,
+                email_norm=contact_normalize.email_normalize(contact.email),
                 company=contact.company,
                 role=contact.role,
                 website=contact.website,
@@ -400,30 +465,32 @@ async def create_vcard(
             await db.refresh(db_contact)
 
     # ── Passo 2: sync Google Contacts (best effort, independente do passo 1) ──
-    try:
-        if db_contact is not None and db_contact.google_contact_id:
-            new_resource = await google_contacts_service.update_google_contact(
-                contact, db_contact.google_contact_id, db, current_user.email
-            )
-            if new_resource is not None and new_resource != db_contact.google_contact_id:
-                # 404 stale: contato recriado com novo resource name
-                db_contact.google_contact_id = new_resource
-                await db.commit()
-                logger.info(
-                    "google_contact_id atualizado (stale→novo): %s", new_resource
+    # Guard: contatos importados da base_heitor NUNCA são sincronizados
+    if db_contact is not None and db_contact.source != "base_heitor":
+        try:
+            if db_contact.google_contact_id:
+                new_resource = await google_contacts_service.update_google_contact(
+                    contact, db_contact.google_contact_id, db, current_user.email
                 )
-            elif new_resource is not None:
-                logger.info("Contato atualizado no Google Contacts: %s", contact.name)
-        elif db_contact is not None and db is not None:
-            google_resource = await google_contacts_service.save_to_google_contacts(
-                contact, db, current_user.email
-            )
-            if google_resource:
-                db_contact.google_contact_id = google_resource
-                await db.commit()
-                logger.info("Contato salvo no Google Contacts: %s", contact.name)
-    except Exception as e:
-        logger.error("Erro ao sincronizar Google Contacts: %s", e)
+                if new_resource is not None and new_resource != db_contact.google_contact_id:
+                    # 404 stale: contato recriado com novo resource name
+                    db_contact.google_contact_id = new_resource
+                    await db.commit()
+                    logger.info(
+                        "google_contact_id atualizado (stale→novo): %s", new_resource
+                    )
+                elif new_resource is not None:
+                    logger.info("Contato atualizado no Google Contacts: %s", contact.name)
+            elif db is not None:
+                google_resource = await google_contacts_service.save_to_google_contacts(
+                    contact, db, current_user.email
+                )
+                if google_resource:
+                    db_contact.google_contact_id = google_resource
+                    await db.commit()
+                    logger.info("Contato salvo no Google Contacts: %s", contact.name)
+        except Exception as e:
+            logger.error("Erro ao sincronizar Google Contacts: %s", e)
 
     # ── Passo 3: e-mail opt-in — dispatch se send_email=True, skipped se False ──
     if db_contact is not None:
@@ -579,7 +646,13 @@ async def export_contacts_csv(
     if db is None:
         raise HTTPException(status_code=503, detail="Banco de dados não configurado")
 
-    filters = [ScannedContact.is_draft.is_(False)]
+    # Exclui a base importada (base_heitor): o CSV é de leads de campo; sem
+    # este filtro os ~8.900 contatos importados vazariam para o export.
+    # Consistente com o default de GET /api/contacts.
+    filters = [
+        ScannedContact.is_draft.is_(False),
+        ScannedContact.source != "base_heitor",
+    ]
     if event_tag:
         filters.append(ScannedContact.event_tag == event_tag)
     if min_importance is not None:
@@ -666,15 +739,27 @@ async def list_contacts(
     tags: Optional[list[str]] = Query(None),
     search: Optional[str] = None,
     include_drafts: bool = False,
+    include_imported: bool = False,
+    limit: int = Query(200, ge=1, le=500),
     db=Depends(get_db),
 ):
-    """Lista contatos salvos no banco (não-draft por padrão)."""
+    """Lista contatos salvos no banco (não-draft por padrão).
+
+    - include_imported=false (default): exclui source='base_heitor'; resposta
+      é uma lista simples (`list[ContactRecord]`), igual ao contrato anterior
+      — o frontend atual (sem toggle de base importada) depende disso.
+    - include_imported=true: inclui importados; aplica `limit` (padrão 200,
+      máx 500) e retorna `{"contacts": [...], "total": N}` para paginação.
+    - search: busca em nome, empresa e email.
+    """
     if db is None:
         return {"error": "Banco de dados não configurado", "contacts": []}
 
     filters = []
     if not include_drafts:
         filters.append(ScannedContact.is_draft.is_(False))
+    if not include_imported:
+        filters.append(ScannedContact.source != "base_heitor")
     if event_tag:
         filters.append(ScannedContact.event_tag == event_tag)
     if min_importance is not None:
@@ -683,23 +768,36 @@ async def list_contacts(
         filters.append(ScannedContact.tags.op("&&")(list(tags)))
     if search:
         like = f"%{search}%"
-        from sqlalchemy import or_
 
         filters.append(
             or_(
                 ScannedContact.name.ilike(like),
                 ScannedContact.company.ilike(like),
+                ScannedContact.email.ilike(like),
             )
         )
 
     has_image_col = (ScannedContact.card_image.isnot(None)).label("has_image")
-    query = (
+    base_query = (
         select(ScannedContact, has_image_col)
         .order_by(ScannedContact.scanned_at.desc())
         .options(defer(ScannedContact.card_image))
     )
     if filters:
-        query = query.where(and_(*filters))
+        base_query = base_query.where(and_(*filters))
+
+    # Total (sem limit) só é calculado quando include_imported=true — é o
+    # único caminho que pagina/limita e precisa do total para o frontend.
+    total: Optional[int] = None
+    if include_imported:
+        count_query = select(func.count()).select_from(ScannedContact)
+        if filters:
+            count_query = count_query.where(and_(*filters))
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0
+        query = base_query.limit(limit)
+    else:
+        query = base_query
 
     result = await db.execute(query)
     rows = result.all()
@@ -753,8 +851,11 @@ async def list_contacts(
                 else None,
                 "email_error": getattr(c, "email_error", None),
                 "last_send": last_send_map.get(c.id),
+                "import_labels": list(c.import_labels or []),
             }
         )
+    if include_imported:
+        return {"contacts": out, "total": total}
     return out
 
 
@@ -810,10 +911,20 @@ async def patch_contact(
     for field, value in sanitized.items():
         setattr(db_contact, field, value)
 
+    # Atualiza campos normalizados se phone/email mudaram
+    if "phone" in sanitized:
+        db_contact.phone_e164 = contact_normalize.phone_to_e164(sanitized["phone"])
+    if "email" in sanitized:
+        db_contact.email_norm = contact_normalize.email_normalize(sanitized["email"])
+
     await db.commit()
     await db.refresh(db_contact)
 
-    if db_contact.google_contact_id and current_user:
+    if (
+        db_contact.source != "base_heitor"
+        and db_contact.google_contact_id
+        and current_user
+    ):
         from app.services import google_contacts_service
 
         try:
@@ -846,7 +957,11 @@ async def delete_contact(
     if db_contact is None:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
 
-    if db_contact.google_contact_id and current_user:
+    if (
+        db_contact.source != "base_heitor"
+        and db_contact.google_contact_id
+        and current_user
+    ):
         from app.services import google_contacts_service
 
         try:
@@ -945,10 +1060,20 @@ async def merge_contact(
             setattr(db_contact, field, value)
         db_contact.is_draft = False
 
+        # Atualiza campos normalizados se phone/email mudaram no merge
+        if "phone" in merged:
+            db_contact.phone_e164 = contact_normalize.phone_to_e164(merged["phone"])
+        if "email" in merged:
+            db_contact.email_norm = contact_normalize.email_normalize(merged["email"])
+
         await db.commit()
         await db.refresh(db_contact)
 
-        if db_contact.google_contact_id and current_user:
+        if (
+            db_contact.source != "base_heitor"
+            and db_contact.google_contact_id
+            and current_user
+        ):
             from app.services import google_contacts_service
 
             try:
@@ -1088,6 +1213,12 @@ async def sync_contact_google(
     db_contact = result.scalar_one_or_none()
     if db_contact is None:
         raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+    if db_contact.source == "base_heitor":
+        raise HTTPException(
+            status_code=400,
+            detail="Contatos importados da base não podem ser sincronizados com o Google",
+        )
 
     from app.services import google_contacts_service
 

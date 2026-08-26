@@ -109,7 +109,9 @@ describe("ReviewCarousel — pacote de materiais", () => {
     );
 
     await waitFor(() => expect(screen.getByText(/Revisar contatos/)).toBeInTheDocument());
-    expect(screen.getByText("CIMI 360")).toBeInTheDocument();
+    // "CIMI 360" aparece como label de produto E de material (ambos mockados
+    // com o mesmo texto); getAllByText evita flakiness de "multiple elements".
+    await waitFor(() => expect(screen.getAllByText("CIMI 360").length).toBeGreaterThan(0));
   });
 
   it('sem produto padrão exibe "Mídia Kit fixo (legado)"', async () => {

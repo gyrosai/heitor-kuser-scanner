@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Camera, QrCode, Layers, Filter, Download } from 'lucide-react';
-import { ALLOWED_TAGS, ContactRecord, EventInfo, Importance } from '@/lib/types';
+import { ALLOWED_TAGS, ContactRecord, EventInfo } from '@/lib/types';
 import { exportCSV, listContacts, listEvents } from '@/lib/api';
 import type { EmailQuota } from '@/lib/api';
 import { useToast } from '@/components/Toast';
@@ -19,9 +19,15 @@ interface Filters {
   event_tag: string;
   min_importance: number | null;
   tags: string[];
+  include_imported: boolean;
 }
 
-const EMPTY_FILTERS: Filters = { event_tag: '', min_importance: null, tags: [] };
+const EMPTY_FILTERS: Filters = {
+  event_tag: '',
+  min_importance: null,
+  tags: [],
+  include_imported: false,
+};
 
 interface HomeScreenProps {
   userName?: string;
@@ -52,6 +58,7 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const { showToast } = useToast();
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
+  const [importedTotal, setImportedTotal] = useState<number | null>(null);
   const [events, setEvents] = useState<EventInfo[]>([]);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
@@ -62,12 +69,24 @@ export function HomeScreen({
   const loadContacts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listContacts({
-        event_tag: filters.event_tag || undefined,
-        min_importance: filters.min_importance ?? undefined,
-        tags: filters.tags.length ? filters.tags : undefined,
-      });
-      setContacts(Array.isArray(data) ? data : []);
+      if (filters.include_imported) {
+        const page = await listContacts({
+          event_tag: filters.event_tag || undefined,
+          min_importance: filters.min_importance ?? undefined,
+          tags: filters.tags.length ? filters.tags : undefined,
+          include_imported: true,
+        });
+        setContacts(Array.isArray(page?.contacts) ? page.contacts : []);
+        setImportedTotal(typeof page?.total === 'number' ? page.total : null);
+      } else {
+        const data = await listContacts({
+          event_tag: filters.event_tag || undefined,
+          min_importance: filters.min_importance ?? undefined,
+          tags: filters.tags.length ? filters.tags : undefined,
+        });
+        setContacts(Array.isArray(data) ? data : []);
+        setImportedTotal(null);
+      }
       setLoadError(false);
     } catch {
       // NÃO zera a lista: "0 contatos" seria mentira. Preserva o que já
@@ -99,7 +118,10 @@ export function HomeScreen({
     : contacts;
 
   const hasActiveFilters =
-    filters.event_tag !== '' || filters.min_importance !== null || filters.tags.length > 0;
+    filters.event_tag !== '' ||
+    filters.min_importance !== null ||
+    filters.tags.length > 0 ||
+    filters.include_imported;
 
   const toggleTag = (tag: string) => {
     setFilters((prev) => ({
@@ -171,7 +193,9 @@ export function HomeScreen({
           <div className="flex items-center justify-between mb-[14px]">
             <p className="text-[10px] font-bold uppercase tracking-[1.4px] text-azul-noturno">
               Contatos
-              <span className="text-text-subtle font-semibold ml-1.5">{contacts.length}</span>
+              <span className="text-text-subtle font-semibold ml-1.5">
+                {importedTotal != null ? importedTotal : contacts.length}
+              </span>
             </p>
             <div className="flex gap-2">
               <button
@@ -279,6 +303,18 @@ export function HomeScreen({
                   })}
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-text-default cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.include_imported}
+                  onChange={(e) =>
+                    setFilters((p) => ({ ...p, include_imported: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-border-default accent-laranja-360"
+                />
+                Incluir Base Heitor (contatos importados)
+              </label>
 
               {hasActiveFilters && (
                 <button

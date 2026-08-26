@@ -13,6 +13,8 @@ interface DuplicateModalProps {
   onForceCreate: () => void;
   onCancel: () => void;
   busy?: boolean;
+  /** "imported": duplicata veio da base do Heitor (source=base_heitor). */
+  matchType?: "scanned" | "imported";
 }
 
 function formatDate(iso?: string | null) {
@@ -98,28 +100,37 @@ export default function DuplicateModal({
   onForceCreate,
   onCancel,
   busy = false,
+  matchType = "scanned",
 }: DuplicateModalProps) {
+  const isImported = matchType === "imported";
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] overflow-y-auto">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-4">
         <h2 className="text-lg font-semibold text-slate-800">
-          Contato parecido encontrado
+          {isImported
+            ? "Já está na base do Heitor"
+            : "Contato parecido encontrado"}
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">
-          Já existe um contato com este email/telefone neste evento. O que você
-          quer fazer?
+          {isImported
+            ? "Este email/telefone já existe na base importada do Heitor. Você pode atualizar o contato existente ou salvar como novo."
+            : "Já existe um contato com este email/telefone neste evento. O que você quer fazer?"}
         </p>
       </header>
 
       <div className="flex-1 px-4 py-6 space-y-4">
         <ContactCard
-          title="Contato existente"
-          subtitle={`Escaneado em ${formatDate(existing.scanned_at)}`}
+          title={isImported ? "Base Heitor" : "Contato existente"}
+          subtitle={
+            isImported
+              ? "Contato importado do Google (base do Heitor)"
+              : `Escaneado em ${formatDate(existing.scanned_at)}`
+          }
           contact={existing}
           contactId={existing.id}
           hasImage={existing.has_image}
-          showImage
-          badgeColor="bg-emerald-500"
+          showImage={!isImported}
+          badgeColor={isImported ? "bg-azul-noturno" : "bg-emerald-500"}
         />
 
         <ContactCard
