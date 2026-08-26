@@ -72,7 +72,7 @@ export default function SequenceKitConfig({
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+    <div className="min-h-screen bg-app-bg flex flex-col">
       <AppHeader title="Antes de revisar" onBack={onBack} />
 
       <div className="flex-1 px-4 pt-8 pb-36 flex flex-col gap-6">
@@ -201,7 +201,7 @@ export default function SequenceKitConfig({
               defaultMaterialIds: quotaExhausted || !sendKit ? [] : defaultMaterialIds,
             })
           }
-          className="w-full rounded-xl bg-[#FA6801] py-3.5 text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
+          className="w-full rounded-xl bg-primary py-3.5 text-base font-semibold text-white active:brightness-110 transition-colors"
         >
           Começar revisão
         </button>

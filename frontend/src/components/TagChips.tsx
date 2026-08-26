@@ -40,7 +40,7 @@ export default function TagChips({
             onClick={readonly ? undefined : () => toggle(tag)}
             className={`inline-flex items-center rounded-full font-medium transition-colors ${heightClass} ${
               active
-                ? "bg-[#FA6801] text-white border border-[#FA6801]"
+                ? "bg-accent-soft text-primary border border-accent"
                 : "bg-slate-100 text-slate-700 border border-slate-200"
             } ${readonly ? "" : "active:scale-95 cursor-pointer"}`}
           >

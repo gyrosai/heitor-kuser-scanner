@@ -1,27 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand CIMI360 */
-  --color-laranja-360: #FA6800;
-  --color-laranja-ambar: #FD9E02;
-  --color-azul-atlantico: #34A9AD;
-  --color-azul-noturno: #002F3F;
+  /* ============================================================
+     Brand CIMI Leads — paleta teal/navy (IDV CIMI Leads)
+     navy  #01303f · teal #36a8ad · grey #d9d9d9
+     Regra: botão primário = navy; accent/selecionado/ativo = teal.
+     Laranja foi descontinuado do tema.
+     ============================================================ */
+
+  /* Aliases semânticos — PREFERIR estes em código novo */
+  --color-primary: #01303f;        /* navy — títulos, header, botão primário */
+  --color-primary-soft: #e8eef0;   /* navy-soft — superfícies/banners navy */
+  --color-accent: #36a8ad;         /* teal — destaque, links, chips ativos */
+  --color-accent-soft: #e6f4f5;    /* teal-soft — fundo de chip/selecionado */
+  --color-accent-dark: #2a8a8f;    /* teal-dark — hover */
+
+  /* Nomes legados (compat) — remapeados para a paleta nova.
+     Renomear ocorrências para os aliases = tarefa pós-evento. */
+  --color-laranja-360: #36a8ad;    /* legado: era laranja; agora = accent (teal) */
+  --color-laranja-ambar: #2a8a8f;  /* legado: agora = teal-dark */
+  --color-azul-atlantico: #36a8ad; /* = accent (teal) */
+  --color-azul-noturno: #01303f;   /* = primary (navy) */
 
   /* Gyros (apenas Powered by) */
   --color-gyros-roxo: #7E22CE;
 
   /* Neutrals */
-  --color-page-bg: #EFEFF2;
-  --color-app-bg: #F4F4F6;
+  --color-page-bg: #F5F7F8;
+  --color-app-bg: #F5F7F8;
   --color-surface: #FFFFFF;
   --color-surface-muted: #F8F8FA;
-  --color-border-default: #E5E5E8;
-  --color-border-strong: #C9C9D0;
+  --color-border-default: #E5E7E8;
+  --color-border-strong: #D9D9D9;
 
   /* Text */
-  --color-text-default: #1A1A1A;
-  --color-text-muted: #5C5C66;
-  --color-text-subtle: #9090A0;
+  --color-text-default: #01303f;
+  --color-text-muted: #4A5B63;
+  --color-text-subtle: #7C8B92;
 
   /* Semantic */
   --color-success-fg: #1B7F47;
@@ -37,10 +52,10 @@
   --color-info-bg: #EFF6FF;
   --color-info-border: #BFDBFE;
 
-  /* Tint backgrounds — classification chips */
-  --color-tint-laranja-bg: #FFF0E5;
-  --color-tint-laranja-border: #FFD4B5;
-  --color-tint-atlantico-bg: #E8F5F6;
+  /* Tint backgrounds — classification chips (remapeados p/ família teal/navy) */
+  --color-tint-laranja-bg: #e6f4f5;    /* legado: era laranja; agora = accent-soft */
+  --color-tint-laranja-border: #B7DEE0;
+  --color-tint-atlantico-bg: #e6f4f5;
   --color-tint-atlantico-border: #B7DEE0;
 
   /* Fonts — resolvidos via next/font CSS vars injetadas no <html> */
@@ -56,8 +71,8 @@
   --radius-2xl: 14px;
 
   /* Shadows */
-  --shadow-primary: 0 6px 16px rgb(250 104 0 / 0.22);
-  --shadow-primary-strong: 0 8px 20px rgb(250 104 0 / 0.25);
+  --shadow-primary: 0 6px 16px rgb(1 48 63 / 0.20);
+  --shadow-primary-strong: 0 8px 20px rgb(1 48 63 / 0.24);
   --shadow-bottom-bar: 0 -4px 12px rgb(0 0 0 / 0.04);
 }
 

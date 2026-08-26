@@ -39,7 +39,7 @@ export default function ReviewListView({
   }, [showToast]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-app-bg">
       <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <button
           onClick={onClose}
@@ -49,7 +49,7 @@ export default function ReviewListView({
           ✕
         </button>
         <p className="text-base font-semibold text-slate-800">A revisar</p>
-        <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-[#FFF3EB] px-2 text-xs font-semibold text-[#FA6801]">
+        <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-accent-soft px-2 text-xs font-semibold text-primary">
           {scans.length}
         </span>
       </header>
@@ -95,7 +95,7 @@ function ListRow({
       onClick={onClick}
       className="flex w-full items-stretch gap-3 rounded-2xl bg-white border border-slate-200 shadow-sm p-3 text-left active:bg-slate-50 transition-colors"
     >
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#FFF3EB] text-base font-semibold text-[#FA6801]">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-base font-semibold text-primary">
         {initial}
       </div>
       <div className="min-w-0 flex-1">
@@ -110,7 +110,7 @@ function ListRow({
           <p className="truncate text-xs text-slate-400">{data.phone}</p>
         )}
       </div>
-      <div className="flex shrink-0 items-center text-xs font-medium text-[#FA6801]">
+      <div className="flex shrink-0 items-center text-xs font-medium text-accent">
         Revisar →
       </div>
     </button>

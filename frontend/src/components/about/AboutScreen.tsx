@@ -20,18 +20,12 @@ export function AboutScreen({ onBack, version }: AboutScreenProps) {
       <div className="flex-1 overflow-y-auto px-5 py-6 pb-16">
         {/* Hero institucional */}
         <div className="flex flex-col items-center py-4 gap-2 mb-4">
-          <svg width="40" height="26" viewBox="0 0 40 26" aria-hidden>
-            <circle cx="10" cy="13" r="10" fill="#FA6800" opacity="0.9" />
-            <circle cx="28" cy="13" r="10" fill="#FA6800" opacity="0.5" />
-          </svg>
-          <div className="flex items-baseline gap-1">
-            <span className="text-[20px] font-extrabold text-laranja-360 leading-none">
-              cimi
-            </span>
-            <span className="text-[17px] font-bold text-azul-noturno leading-none tracking-[1.2px]">
-              LEADS
-            </span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/logo-horizontal-color.png"
+            alt="CIMI Leads"
+            className="h-9 w-auto"
+          />
         </div>
 
         <div className="text-[11px] font-bold uppercase tracking-[1.4px] text-laranja-360 mb-3">

@@ -475,8 +475,8 @@ export default function Home() {
 
     if (state === "loading") {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
+        <div className="flex min-h-screen flex-col items-center justify-center bg-app-bg px-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent" />
           <p className="mt-4 text-lg text-slate-500">Analisando cartão...</p>
         </div>
       );
@@ -536,7 +536,7 @@ export default function Home() {
 
     if (state === "success") {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-4">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-app-bg px-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
             <svg
               className="h-10 w-10 text-emerald-600"

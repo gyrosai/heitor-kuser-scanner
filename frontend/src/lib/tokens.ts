@@ -28,16 +28,32 @@
 // COLORS
 // =========================================
 export const colors = {
-  /** Cores oficiais do brand CIMI360 (slide 10 do guia de marca) */
+  /**
+   * Cores oficiais do brand CIMI Leads (IDV — paleta teal/navy).
+   * navy #01303f · teal #36a8ad · grey #d9d9d9.
+   * Regra: botão primário = navy (primary); accent/selecionado = teal (accent).
+   * Os nomes legados (laranja360 etc.) foram remapeados p/ a paleta nova.
+   */
   brand: {
-    /** Laranja 360 — primária, CTAs, accents, badges ativas */
-    laranja360: "#FA6800",
-    /** Laranja Âmbar — accent secundário, warning */
-    laranjaAmbar: "#FD9E02",
-    /** Azul Atlântico — secundária, badges CIMI Invest */
-    azulAtlantico: "#34A9AD",
-    /** Azul Noturno — texto institucional, status bar, fundos sóbrios */
-    azulNoturno: "#002F3F",
+    /** Navy — primária, títulos, header, botão primário */
+    primary: "#01303F",
+    /** Navy-soft — superfícies/banners navy */
+    primarySoft: "#E8EEF0",
+    /** Teal — destaque, links, chips ativos, ícones ativos */
+    accent: "#36A8AD",
+    /** Teal-soft — fundo de chip/selecionado */
+    accentSoft: "#E6F4F5",
+    /** Teal-dark — hover */
+    accentDark: "#2A8A8F",
+
+    /** @deprecated legado: era laranja; agora aponta p/ accent (teal) */
+    laranja360: "#36A8AD",
+    /** @deprecated legado: agora teal-dark */
+    laranjaAmbar: "#2A8A8F",
+    /** @deprecated legado: agora accent (teal) */
+    azulAtlantico: "#36A8AD",
+    /** @deprecated legado: agora primary (navy) */
+    azulNoturno: "#01303F",
   },
 
   /** Marca Gyros — usar APENAS na seção "Powered by" / Sobre */
@@ -50,27 +66,27 @@ export const colors = {
   neutral: {
     white: "#FFFFFF",
     /** Background da página inteira (fora do app) */
-    pageBg: "#EFEFF2",
+    pageBg: "#F5F7F8",
     /** Background interno do app */
-    appBg: "#F4F4F6",
+    appBg: "#F5F7F8",
     /** Cards, inputs */
     surface: "#FFFFFF",
     /** Cards secundários (modo Rajada terciário) */
     surfaceMuted: "#F8F8FA",
     /** Bordas padrão */
-    border: "#E5E5E8",
-    /** Bordas de elementos interativos (estado default) */
-    borderStrong: "#C9C9D0",
+    border: "#E5E7E8",
+    /** Bordas de elementos interativos (estado default) — grey da marca */
+    borderStrong: "#D9D9D9",
   },
 
   /** Tipografia */
   text: {
     /** Texto corpo principal */
-    default: "#1A1A1A",
+    default: "#01303F",
     /** Texto secundário, descrições */
-    muted: "#5C5C66",
+    muted: "#4A5B63",
     /** Texto terciário, timestamps, captions */
-    subtle: "#9090A0",
+    subtle: "#7C8B92",
     /** Texto sobre fundos escuros */
     inverse: "#FFFFFF",
   },
@@ -107,12 +123,13 @@ export const colors = {
    * Usado pra classification chips (Invest azul, 360 laranja).
    */
   tint: {
+    /** @deprecated legado: era laranja; agora família teal (accent-soft) */
     laranja: {
-      bg: "#FFF0E5",
-      border: "#FFD4B5",
+      bg: "#E6F4F5",
+      border: "#B7DEE0",
     },
     atlantico: {
-      bg: "#E8F5F6",
+      bg: "#E6F4F5",
       border: "#B7DEE0",
     },
   },
@@ -260,10 +277,10 @@ export const shadow = {
   lg: "0 8px 24px rgba(0,0,0,0.1)",
   /** Sombra hero — capture preview */
   xl: "0 12px 30px rgba(0,0,0,0.18)",
-  /** CTA primário Laranja 360 */
-  primary: "0 6px 16px rgba(250,104,0,0.22)",
+  /** CTA primário navy */
+  primary: "0 6px 16px rgba(1,48,63,0.20)",
   /** Capture card primário (mais forte) */
-  primaryStrong: "0 8px 20px rgba(250,104,0,0.25)",
+  primaryStrong: "0 8px 20px rgba(1,48,63,0.24)",
   /** Bottom bar — sombra invertida pra cima */
   bottomBar: "0 -4px 12px rgba(0,0,0,0.04)",
   /** Phone frame mockup (só em design review) */
@@ -368,7 +385,7 @@ export const component = {
   },
   buttonPrimary: {
     height: 50,
-    bg: colors.brand.laranja360,
+    bg: colors.brand.primary,
     color: colors.text.inverse,
     radius: radius.xl,
     fontSize: fontSize.lg,
@@ -378,8 +395,8 @@ export const component = {
   buttonSecondary: {
     height: 44,
     bg: "transparent",
-    color: colors.brand.azulNoturno,
-    border: `1px solid ${colors.neutral.border}`,
+    color: colors.brand.primary,
+    border: `1px solid ${colors.brand.accent}`,
     radius: radius.xl,
     fontSize: fontSize.base,
     fontWeight: fontWeight.bold,
@@ -426,11 +443,14 @@ export default tokens;
 @import "tailwindcss";
 
 @theme {
-  // Brand CIMI360
-  --color-laranja-360: #FA6800;
-  --color-laranja-ambar: #FD9E02;
-  --color-azul-atlantico: #34A9AD;
-  --color-azul-noturno: #002F3F;
+  // Brand CIMI Leads (teal/navy). Ver globals.css para o bloco real.
+  --color-primary: #01303f;   // navy
+  --color-accent: #36a8ad;    // teal
+  // legados remapeados:
+  --color-laranja-360: #36a8ad;
+  --color-laranja-ambar: #2a8a8f;
+  --color-azul-atlantico: #36a8ad;
+  --color-azul-noturno: #01303f;
 
   // Gyros (apenas Powered by)
   --color-gyros-roxo: #7E22CE;

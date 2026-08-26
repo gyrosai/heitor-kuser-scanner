@@ -16,11 +16,11 @@ interface ClassificationChipProps {
 }
 
 const PRODUCT_COLORS: Record<string, string> = {
-  cimi_360: '#FA6800',
-  cimi_invest: '#34A9AD',
-  leilao: '#8B5CF6',
-  indip: '#059669',
-  feirao: '#DC2626',
+  cimi_360: '#01303F', // navy
+  cimi_invest: '#36A8AD', // teal
+  leilao: '#5B8DEF',
+  indip: '#2E8B57',
+  feirao: '#B5563C',
 };
 
 const PRODUCT_SHORT_LABELS: Record<string, string> = {
@@ -32,7 +32,7 @@ const PRODUCT_SHORT_LABELS: Record<string, string> = {
 };
 
 function getColor(key: string): string {
-  return PRODUCT_COLORS[key] || '#002F3F';
+  return PRODUCT_COLORS[key] || '#01303F';
 }
 
 function getShortLabel(key: string): string {

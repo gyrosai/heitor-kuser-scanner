@@ -449,19 +449,19 @@ export default function ReviewCarousel({
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FA6801] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent" />
       </div>
     );
   }
 
   if (items.length === 0 || !current) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] px-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-app-bg px-6">
         <p className="text-lg text-slate-700">Nada pra revisar</p>
         <button
           onClick={onClose}
-          className="mt-4 rounded-xl bg-[#FA6801] px-6 py-3 text-base font-semibold text-white"
+          className="mt-4 rounded-xl bg-primary px-6 py-3 text-base font-semibold text-white"
         >
           Voltar
         </button>
@@ -495,7 +495,7 @@ export default function ReviewCarousel({
   })();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-32">
+    <div className="min-h-screen bg-app-bg pb-32">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <button
@@ -522,7 +522,7 @@ export default function ReviewCarousel({
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full bg-[#FA6801] transition-all duration-300"
+            className="h-full bg-accent transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -661,7 +661,7 @@ export default function ReviewCarousel({
             <button
               onClick={applyEventTagToRest}
               disabled={!current.form.event_tag?.trim()}
-              className="mt-2 text-xs font-medium text-[#FA6801] underline disabled:text-slate-300 disabled:no-underline"
+              className="mt-2 text-xs font-medium text-accent underline disabled:text-slate-300 disabled:no-underline"
             >
               Aplicar a todos os restantes
             </button>
@@ -683,7 +683,7 @@ export default function ReviewCarousel({
             <button
               onClick={() => handleSave(true)}
               disabled={saving || !current.form.name?.trim()}
-              className="flex-[2] rounded-xl bg-[#FA6801] py-3 text-base font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
+              className="flex-[2] rounded-xl bg-primary py-3 text-base font-semibold text-white disabled:opacity-40 active:brightness-110 transition-colors"
               style={{ minHeight: 52 }}
             >
               {saving ? "Salvando..." : "Salvar e finalizar"}
@@ -692,7 +692,7 @@ export default function ReviewCarousel({
             <button
               onClick={() => handleSave(false)}
               disabled={saving || !current.form.name?.trim()}
-              className="flex-[2] rounded-xl bg-[#FA6801] py-3 text-base font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
+              className="flex-[2] rounded-xl bg-primary py-3 text-base font-semibold text-white disabled:opacity-40 active:brightness-110 transition-colors"
               style={{ minHeight: 52 }}
             >
               {saving ? "Salvando..." : "Salvar e próximo"}
@@ -748,7 +748,7 @@ export default function ReviewCarousel({
             <button
               type="button"
               onClick={() => setPickerOpen(false)}
-              className="w-full rounded-xl bg-[#FA6801] py-3.5 text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
+              className="w-full rounded-xl bg-primary py-3.5 text-base font-semibold text-white active:brightness-110 transition-colors"
             >
               Confirmar
             </button>

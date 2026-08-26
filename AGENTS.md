@@ -88,6 +88,9 @@ Também existe no editor a seção "Mídia kit por e-mail": checkbox "Enviar Mí
 - Migration que altera tabela EXISTENTE roda ANTES do deploy (`create_all` não adiciona colunas).
 - `.env.example` só com placeholders; GitHub push protection bloqueia segredos.
 - Produto sem template usa texto genérico; ausência de dado nunca bloqueia save nem envio.
+- **Identidade visual (rebrand v0.4):** paleta **teal/navy** — navy `#01303f` (títulos, header, botão primário), teal `#36a8ad` (destaque, links, chips/ícones ativos), grey `#d9d9d9` (bordas). Derivados: teal-soft `#e6f4f5`, navy-soft `#e8eef0`, teal-dark `#2a8a8f`, surface `#f5f7f8`, texto secundário `#4a5b63`. **Laranja foi descontinuado do tema.** Regra: **botão primário = navy; accent/selecionado/ativo = teal; destrutivo = vermelho.** Texto branco sobre teal só em ≥16px bold (botões); texto normal sobre teal → usar navy. Tipografia Montserrat (400/600/800). Tokens vivem em `frontend/src/app/globals.css` (`@theme`) + `frontend/src/lib/tokens.ts` — mantê-los em sincronia. Preferir aliases `primary`/`accent`/`accent-soft`; nomes legados (`laranja-360`, `azul-noturno`, `azul-atlantico`) ainda funcionam (remapeados) e serão renomeados pós-evento.
+- **Banner de pendências = `PendingSavesBanner`** (não existe "AccountBanner"). Assets de marca ficam em `frontend/public/brand/` (logos) e `frontend/public/icons/` (ícones PWA/favicon/apple-touch). PWA já instalado guarda o ícone antigo em cache — precisa remover e reinstalar o app para ver o novo.
+- **Tarefa futura (fora do rebrand):** template de e-mail/mídia kit ainda usa a identidade antiga — atualizar pelo pipeline de envio, escopo separado.
 
 ## 6. O que está sendo pedido agora (Henrique, mapa mental de 22/08)
 
