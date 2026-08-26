@@ -1,4 +1,4 @@
-import { QrCode, Cloud, CloudOff, Mail, MailCheck, AlertCircle, Star, RefreshCw } from 'lucide-react';
+import { QrCode, Cloud, CloudOff, Mail, MailCheck, AlertCircle, Star, RefreshCw, Database } from 'lucide-react';
 import { ContactRecord, LastSend } from '@/lib/types';
 import { FALLBACK_TAXONOMY, getProductLabel, tagsToClassificacoes } from '@/lib/taxonomy';
 import { getContactImageUrl } from '@/lib/api';
@@ -86,6 +86,14 @@ function Thumb({ contact }: { contact: ContactRecord }) {
     );
   }
 
+  if (contact.source === 'base_heitor') {
+    return (
+      <div className="w-14 h-14 shrink-0 rounded-lg bg-surface-muted border border-border-default flex items-center justify-center">
+        <Database size={26} strokeWidth={1.4} className="text-text-subtle" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-14 h-14 shrink-0 rounded-lg bg-azul-noturno flex items-center justify-center text-white text-lg font-bold">
       {initials(contact.name || '?')}
@@ -124,6 +132,15 @@ function SyncBadge({ synced }: { synced: boolean }) {
   );
 }
 
+function BaseHeitorBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-azul-noturno bg-surface-muted rounded-full px-2 py-0.5">
+      <Database size={11} strokeWidth={2.2} />
+      Base Heitor
+    </span>
+  );
+}
+
 function EmailBadge({ status }: { status: ContactRecord['email_status'] }) {
   if (status === 'sent') {
     return (
@@ -155,6 +172,7 @@ function EmailBadge({ status }: { status: ContactRecord['email_status'] }) {
 export function ContactListCard({ contact, onClick, onResend }: ContactListCardProps) {
   const chips = getChips(contact.tags ?? []);
   const importance = contact.importance ?? 0;
+  const isImported = contact.source === 'base_heitor';
   const synced = !!contact.google_contact_id;
   const lastSendLabel = formatLastSend(contact.last_send);
 

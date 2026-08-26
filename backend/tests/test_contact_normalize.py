@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from app.services.contact_normalize import email_normalize, phone_to_e164
 
 

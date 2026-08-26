@@ -4,6 +4,7 @@ import {
   BatchImageItem,
   BatchScanResponse,
   ContactData,
+  ContactListPage,
   ContactRecord,
   EventInfo,
   PackageSelection,
@@ -271,13 +272,38 @@ export async function disconnectGoogle(): Promise<void> {
   }
 }
 
-export async function listContacts(params?: {
+interface ListContactsParams {
   event_tag?: string;
   min_importance?: number;
   tags?: string[];
   search?: string;
   include_drafts?: boolean;
-}): Promise<ContactRecord[]> {
+  include_imported?: boolean;
+  limit?: number;
+}
+
+/**
+ * GET /api/contacts.
+ *
+ * Contrato do backend (backend/app/routers/scan.py::list_contacts):
+ * - include_imported=false (padrão): resposta é `ContactRecord[]` puro —
+ *   contrato legado, mantido por compatibilidade.
+ * - include_imported=true: resposta é `{contacts, total}` (paginada via
+ *   `limit`) — usado pelo toggle "Base Heitor".
+ *
+ * Os overloads abaixo dão o tipo de retorno correto em cada chamada; NUNCA
+ * remover o overload sem `include_imported` — é o caminho usado hoje pelo
+ * HomeScreen sem o toggle.
+ */
+export async function listContacts(
+  params?: Omit<ListContactsParams, "include_imported"> & { include_imported?: false },
+): Promise<ContactRecord[]>;
+export async function listContacts(
+  params: Omit<ListContactsParams, "include_imported"> & { include_imported: true },
+): Promise<ContactListPage>;
+export async function listContacts(
+  params?: ListContactsParams,
+): Promise<ContactRecord[] | ContactListPage> {
   const url = mkUrl("/api/contacts");
   if (params?.event_tag) url.searchParams.set("event_tag", params.event_tag);
   if (params?.min_importance != null)
@@ -288,12 +314,18 @@ export async function listContacts(params?: {
   if (params?.search) url.searchParams.set("search", params.search);
   if (params?.include_drafts)
     url.searchParams.set("include_drafts", "true");
+  if (params?.include_imported)
+    url.searchParams.set("include_imported", "true");
+  if (params?.limit != null) url.searchParams.set("limit", String(params.limit));
 
   const res = await doFetch(
     url.toString(),
     { credentials: "include" },
     READ_TIMEOUT_MS,
   );
+  if (params?.include_imported) {
+    return jsonOrThrow<ContactListPage>(res);
+  }
   return jsonOrThrow<ContactRecord[]>(res);
 }
 

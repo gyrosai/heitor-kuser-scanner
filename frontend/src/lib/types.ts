@@ -33,7 +33,7 @@ export interface ContactData {
   role: string | null;
   website: string | null;
   notes: string | null;
-  source: "qrcode" | "card_photo";
+  source: "qrcode" | "card_photo" | "base_heitor";
   event_tag: string | null;
   importance: Importance;
   tags: string[];
@@ -62,6 +62,14 @@ export interface ContactRecord extends ContactData {
   email_sent_at?: string | null;
   email_error?: string | null;
   last_send?: LastSend | null;
+  /** Marcadores originais do Google Contacts (só presente em source="base_heitor"). */
+  import_labels?: string[];
+}
+
+/** Resposta paginada de GET /api/contacts?include_imported=true. */
+export interface ContactListPage {
+  contacts: ContactRecord[];
+  total: number;
 }
 
 export interface ScanResponse {
@@ -88,6 +96,8 @@ export interface ConflictError {
   existing_id: number;
   new: ContactData;
   message?: string;
+  /** "imported": veio da base do Heitor (source=base_heitor); "scanned": duplicata normal. */
+  match_type?: "scanned" | "imported";
 }
 
 export class ApiConflictError extends Error {
