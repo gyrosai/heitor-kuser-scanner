@@ -18,9 +18,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin")
 
 
-@router.post(
-    "/contacts/import-google-csv", dependencies=[Depends(require_admin_token)]
-)
+def _column_limit(name: str) -> int | None:
+    """Lê o limite de comprimento (VARCHAR(n)) da coluna direto do modelo.
+
+    Retorna None para colunas sem limite (Text) ou inexistentes. Assim o
+    truncamento acompanha o schema automaticamente, sem números mágicos.
+    """
+    col = ScannedContact.__table__.columns.get(name)
+    if col is None:
+        return None
+    return getattr(col.type, "length", None)
+
+
+def _fit(value: str | None, column: str) -> tuple[str | None, bool]:
+    """Trunca `value` ao limite da coluna `column`. Retorna (valor, truncou).
+
+    Nunca recebe número solto: valores multi-valor já foram isolados no
+    parser. Só corta o excedente de um campo já isolado.
+    """
+    limit = _column_limit(column)
+    if value is None or limit is None or len(value) <= limit:
+        return value, False
+    return value[:limit], True
+
+
+@router.post("/contacts/import-google-csv", dependencies=[Depends(require_admin_token)])
 async def import_google_contacts_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(False),
@@ -48,6 +70,7 @@ async def import_google_contacts_csv(
     skipped = 0
     invalid = 0
     skipped_personal = 0
+    truncated = 0
     errors: list[dict] = []
     skipped_details: list[dict] = []
 
@@ -109,7 +132,9 @@ async def import_google_contacts_csv(
         if is_dup:
             skipped += 1
             if len(skipped_details) < 20:
-                skipped_details.append({"line": idx, "existing_id": dup_id, "reason": "duplicado"})
+                skipped_details.append(
+                    {"line": idx, "existing_id": dup_id, "reason": "duplicado"}
+                )
             continue
 
         # Registra a chave normalizada IMEDIATAMENTE (antes do commit em lote)
@@ -121,19 +146,39 @@ async def import_google_contacts_csv(
         if email_norm_val:
             existing_by_email[email_norm_val] = None
 
+        # Ajusta TODOS os campos de texto ao limite da respectiva coluna,
+        # lendo o tamanho do modelo. Feito idêntico no dry_run e no insert
+        # real, para o dry_run nunca aprovar o que o real rejeitaria.
+        name_v, t_name = _fit(row.name, "name")
+        company_v, t_company = _fit(row.company, "company")
+        role_v, t_role = _fit(row.role, "role")
+        phone_raw = row.phones[0] if row.phones else None
+        phone_v, t_phone = _fit(phone_raw, "phone")
+        email_raw = row.emails[0] if row.emails else None
+        email_v, t_email = _fit(email_raw, "email")
+        website_raw = row.websites[0] if row.websites else None
+        website_v, t_website = _fit(website_raw, "website")
+        phone_e164_v, t_e164 = _fit(phone_e164, "phone_e164")
+        email_norm_v, t_enorm = _fit(email_norm_val, "email_norm")
+        if any(
+            (t_name, t_company, t_role, t_phone, t_email, t_website, t_e164, t_enorm)
+        ):
+            truncated += 1
+
         if dry_run:
             created += 1
             continue
 
         # Cria contato importado
         contact = ScannedContact(
-            name=row.name,
-            company=row.company,
-            role=row.role,
-            phone=row.phones[0] if row.phones else None,
-            phone_e164=phone_e164,
-            email=row.emails[0] if row.emails else None,
-            email_norm=email_norm_val,
+            name=name_v,
+            company=company_v,
+            role=role_v,
+            phone=phone_v,
+            phone_e164=phone_e164_v,
+            email=email_v,
+            email_norm=email_norm_v,
+            website=website_v,
             notes=row.notes,
             source="base_heitor",
             is_draft=False,
@@ -170,6 +215,7 @@ async def import_google_contacts_csv(
         "skipped": skipped,
         "invalid": invalid,
         "skipped_personal": skipped_personal,
+        "truncated": truncated,
         "errors": errors,
         "skipped_details": skipped_details,
         "dry_run": dry_run,

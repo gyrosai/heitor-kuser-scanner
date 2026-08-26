@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 
 interface NetworkContextValue {
   online: boolean;
@@ -8,21 +8,30 @@ interface NetworkContextValue {
 
 const NetworkContext = createContext<NetworkContextValue>({ online: true });
 
-export function NetworkProvider({ children }: { children: React.ReactNode }) {
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
+function subscribe(callback: () => void): () => void {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
 
-  useEffect(() => {
-    const handleOnline = () => setOnline(true);
-    const handleOffline = () => setOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+// Cliente: valor real do navegador.
+function getSnapshot(): boolean {
+  return typeof navigator !== "undefined" ? navigator.onLine : true;
+}
+
+// Servidor: sem `navigator`, assume online. O primeiro render do cliente usa
+// ESTE snapshot para bater com o HTML do servidor (evita hydration mismatch,
+// React #418/#423); useSyncExternalStore troca para o valor real logo após,
+// sem setState dentro de effect.
+function getServerSnapshot(): boolean {
+  return true;
+}
+
+export function NetworkProvider({ children }: { children: React.ReactNode }) {
+  const online = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   return (
     <NetworkContext.Provider value={{ online }}>

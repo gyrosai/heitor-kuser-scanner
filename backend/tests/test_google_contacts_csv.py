@@ -227,7 +227,7 @@ def test_multiple_emails():
     assert len(rows) == 1
     r = rows[0]
     assert r.emails == ["joao@example.com", "joao2@example.com"]
-    assert "Outros emails: joao2@example.com" in r.notes
+    assert "Outros e-mails: joao2@example.com" in r.notes
 
 
 def test_multiple_phones():
@@ -249,6 +249,65 @@ def test_multiple_phones():
     r = rows[0]
     assert r.phones == ["(11) 98765-4321", "(11) 3456-7890"]
     assert "Outros telefones" in r.notes
+
+
+def test_three_phones_in_single_cell_split():
+    """Google junta vários telefones na MESMA célula com ' ::: '. O primeiro
+    que normaliza vira o primário; os demais vão para notes."""
+    csv_text = _build_csv(
+        [
+            {
+                "First Name": "Multi",
+                "Labels": "* myContacts",
+                "Phone 1 - Label": "Mobile",
+                "Phone 1 - Value": "(11) 98765-4321 ::: (21) 3456-7890 ::: (11) 91234-5678",
+            }
+        ]
+    )
+    rows = parse_google_contacts_csv(csv_text)
+    assert len(rows) == 1
+    r = rows[0]
+    # Célula única virou 3 números isolados (nenhum contém ' ::: ')
+    assert r.phones == ["(11) 98765-4321", "(21) 3456-7890", "(11) 91234-5678"]
+    assert all(" ::: " not in p for p in r.phones)
+    # Primário isolado + os outros em notes
+    assert "Outros telefones: (21) 3456-7890, (11) 91234-5678" in r.notes
+
+
+def test_multiple_websites_split_to_notes():
+    csv_text = _build_csv(
+        [
+            {
+                "First Name": "Site",
+                "Labels": "* myContacts",
+                "E-mail 1 - Value": "site@example.com",
+                "Website 1 - Value": "https://a.com ::: https://b.com",
+            }
+        ]
+    )
+    rows = parse_google_contacts_csv(csv_text)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r.websites == ["https://a.com", "https://b.com"]
+    assert "Outros sites: https://b.com" in r.notes
+
+
+def test_first_normalizable_phone_becomes_primary():
+    """Se o 1º número não normaliza mas o 2º sim, o normalizável vira primário
+    (garante coerência entre `phone` e `phone_e164`)."""
+    csv_text = _build_csv(
+        [
+            {
+                "First Name": "Ordem",
+                "Labels": "* myContacts",
+                "Phone 1 - Value": "ramal 22 ::: (11) 98765-4321",
+            }
+        ]
+    )
+    rows = parse_google_contacts_csv(csv_text)
+    r = rows[0]
+    assert r.phones[0] == "(11) 98765-4321"
+    assert "ramal 22" in r.notes
 
 
 def test_old_layout_detected():
