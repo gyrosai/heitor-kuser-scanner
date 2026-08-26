@@ -42,6 +42,7 @@ def _make_contact(id: int, **overrides) -> ScannedContact:
     c.email_status = None
     c.email_sent_at = None
     c.email_error = None
+    c.import_labels = []
     for k, v in overrides.items():
         setattr(c, k, v)
     return c
@@ -72,7 +73,10 @@ def _make_log(
 
 
 def _db_for_list_contacts(contact_rows, logs):
-    """db.execute é chamado 2x: (1) query de contatos, (2) query de email_logs."""
+    """db.execute é chamado 3x: (1) count, (2) query de contatos, (3) query de email_logs."""
+    count_result = MagicMock()
+    count_result.scalar.return_value = len(contact_rows)
+
     contacts_result = MagicMock()
     contacts_result.all.return_value = contact_rows
 
@@ -80,7 +84,7 @@ def _db_for_list_contacts(contact_rows, logs):
     logs_result.scalars.return_value.all.return_value = logs
 
     db = AsyncMock()
-    db.execute = AsyncMock(side_effect=[contacts_result, logs_result])
+    db.execute = AsyncMock(side_effect=[count_result, contacts_result, logs_result])
     return db
 
 
@@ -96,9 +100,10 @@ async def test_list_contacts_includes_last_send_for_each_contact():
     ]
     db = _db_for_list_contacts([(c1, False), (c2, False)], logs)
 
-    out = await list_contacts(db=db, tags=None)
+    out = await list_contacts(db=db, tags=None, limit=200)
 
-    by_id = {c["id"]: c for c in out}
+    contacts = out["contacts"]
+    by_id = {c["id"]: c for c in contacts}
     assert by_id[1]["last_send"] == {
         "channel": "email",
         "product_key": "cimi_360",
@@ -111,10 +116,10 @@ async def test_list_contacts_includes_last_send_for_each_contact():
 @pytest.mark.asyncio
 async def test_list_contacts_no_contacts_skips_email_logs_query():
     db = _db_for_list_contacts([], [])
-    out = await list_contacts(db=db, tags=None)
-    assert out == []
-    # só 1 chamada (contatos); sem contact_ids, não deveria nem consultar email_logs
-    assert db.execute.await_count == 1
+    out = await list_contacts(db=db, tags=None, limit=200)
+    assert out == {"contacts": [], "total": 0}
+    # 1 chamada (count) + 1 chamada (contatos) = 2; sem contact_ids, não consulta email_logs
+    assert db.execute.await_count == 2
 
 
 @pytest.mark.asyncio

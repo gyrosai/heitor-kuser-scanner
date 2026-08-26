@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.routers import auth, email, materials, scan, transcribe
+from app.routers import admin, auth, email, materials, scan, transcribe
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ app.include_router(auth.router)
 app.include_router(transcribe.router)
 app.include_router(email.router)
 app.include_router(materials.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")

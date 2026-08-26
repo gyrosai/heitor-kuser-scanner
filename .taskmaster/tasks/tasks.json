@@ -269,7 +269,7 @@
         "dependencies": [
           "11"
         ],
-        "status": "pending",
+        "status": "deferred",
         "subtasks": [
           {
             "id": 1,
@@ -309,7 +309,8 @@
         ],
         "complexity": 3,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Expand into backend token inspection logic, health response enrichment, logging/safety review, frontend status indicator implementation, and tests for all token states."
+        "expansionPrompt": "Expand into backend token inspection logic, health response enrichment, logging/safety review, frontend status indicator implementation, and tests for all token states.",
+        "updatedAt": "2026-08-25T13:45:47.262Z"
       },
       {
         "id": "15",
@@ -928,7 +929,7 @@
           "19",
           "20"
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -1037,7 +1038,8 @@
         ],
         "complexity": 9,
         "recommendedSubtasks": 8,
-        "expansionPrompt": "Split into import endpoint and dedup logic, duplicate detection expansion, CSV export changes, observability instrumentation, timeout-enabled frontend fetch adoption, Sentry breadcrumb wiring, environment/release guardrails, and end-to-end smoke tests."
+        "expansionPrompt": "Split into import endpoint and dedup logic, duplicate detection expansion, CSV export changes, observability instrumentation, timeout-enabled frontend fetch adoption, Sentry breadcrumb wiring, environment/release guardrails, and end-to-end smoke tests.",
+        "updatedAt": "2026-08-25T17:48:44.294Z"
       },
       {
         "id": "22",
@@ -1070,7 +1072,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-25T13:16:24.825Z",
+      "lastModified": "2026-08-25T17:48:44.295Z",
       "taskCount": 13,
       "completedCount": 8,
       "tags": [
