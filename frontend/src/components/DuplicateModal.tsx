@@ -104,7 +104,7 @@ export default function DuplicateModal({
 }: DuplicateModalProps) {
   const isImported = matchType === "imported";
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex flex-col bg-app-bg overflow-y-auto">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-4">
         <h2 className="text-lg font-semibold text-slate-800">
           {isImported
@@ -137,7 +137,7 @@ export default function DuplicateModal({
           title="Novo escaneado"
           contact={newContact}
           showImage={false}
-          badgeColor="bg-[#FA6801]"
+          badgeColor="bg-accent"
         />
       </div>
 
@@ -145,7 +145,7 @@ export default function DuplicateModal({
         <button
           onClick={onMerge}
           disabled={busy}
-          className="w-full rounded-xl bg-[#FA6801] py-[14px] text-base font-semibold text-white disabled:opacity-40 active:bg-[#E55D00] transition-colors"
+          className="w-full rounded-xl bg-primary py-[14px] text-base font-semibold text-white disabled:opacity-40 active:brightness-110 transition-colors"
           style={{ minHeight: 52 }}
         >
           {busy ? "Atualizando..." : "Atualizar existente"}

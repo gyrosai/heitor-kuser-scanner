@@ -12,9 +12,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
-  primary: 'bg-laranja-360 text-white shadow-primary hover:brightness-110 active:scale-[0.98]',
-  secondary: 'bg-white text-azul-noturno border border-border-default hover:bg-app-bg',
-  ghost: 'bg-transparent text-azul-noturno hover:bg-app-bg',
+  primary: 'bg-primary text-white shadow-primary hover:brightness-110 active:scale-[0.98]',
+  secondary: 'bg-white text-primary border border-accent hover:bg-accent-soft',
+  ghost: 'bg-transparent text-primary hover:bg-app-bg',
   destructive: 'bg-transparent text-danger-fg hover:bg-danger-bg',
 };
 
@@ -49,7 +49,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={isDisabled}
       className={clsx(
         'inline-flex items-center justify-center gap-2 rounded-xl font-bold transition-all',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-laranja-360 focus-visible:ring-offset-2',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
         variantClasses[variant],
         sizeClasses[size],
         fullWidth && 'w-full',

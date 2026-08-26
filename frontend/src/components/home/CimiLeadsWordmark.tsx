@@ -1,13 +1,13 @@
-// TODO Fase 6: substituir por logo CIMI360 oficial quando disponível
+// Logo oficial CIMI Leads (IDV teal/navy)
 export function CimiLeadsWordmark() {
   return (
-    <div className="flex items-baseline gap-2 px-4 pt-1 pb-[14px]">
-      <span className="text-[26px] font-extrabold text-laranja-360 leading-none tracking-[-1px]">
-        cimi
-      </span>
-      <span className="text-[22px] font-bold text-azul-noturno leading-none tracking-[1.5px]">
-        LEADS
-      </span>
+    <div className="flex items-center px-4 pt-1 pb-[14px]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/logo-horizontal-color.png"
+        alt="CIMI Leads"
+        className="h-7 w-auto"
+      />
     </div>
   );
 }

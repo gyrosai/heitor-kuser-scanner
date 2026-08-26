@@ -17,15 +17,15 @@ interface ClassificacaoSectionProps {
 }
 
 const PRODUCT_COLORS: Record<string, string> = {
-  cimi_360: colors.brand.laranja360,
-  cimi_invest: colors.brand.azulAtlantico,
-  leilao: "#8B5CF6", // violet
-  indip: "#059669", // emerald
-  feirao: "#DC2626", // red
+  cimi_360: colors.brand.primary, // navy #01303f
+  cimi_invest: colors.brand.accent, // teal #36a8ad
+  leilao: "#5B8DEF", // azul
+  indip: "#2E8B57", // verde
+  feirao: "#B5563C", // terracota
 };
 
 function getColor(key: string): string {
-  return PRODUCT_COLORS[key] || colors.brand.azulNoturno;
+  return PRODUCT_COLORS[key] || colors.brand.primary;
 }
 
 export default function ClassificacaoSection({

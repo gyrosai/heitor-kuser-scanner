@@ -30,7 +30,7 @@ export default function Field({
     "w-full rounded-xl border bg-white px-4 py-3 text-slate-800 outline-none transition-colors";
   const stateClass = isEmpty
     ? "border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-    : "border-slate-200 focus:border-[#FA6801] focus:ring-2 focus:ring-[#FA6801]/20";
+    : "border-slate-200 focus:border-accent focus:ring-2 focus:ring-accent/20";
   const disabledClass = disabled ? "opacity-60 cursor-not-allowed" : "";
 
   return (

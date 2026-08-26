@@ -30,7 +30,10 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   icons: {
-    icon: [{ url: "/icons/favicon.ico", sizes: "32x32", type: "image/x-icon" }],
+    icon: [
+      { url: "/icons/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
@@ -40,7 +43,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: "#002F3F",
+  themeColor: "#01303F",
 };
 
 export default function RootLayout({

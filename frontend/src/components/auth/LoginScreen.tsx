@@ -17,33 +17,22 @@ export function LoginScreen({ onLogin, loading = false }: LoginScreenProps) {
     <div className="fixed inset-0 bg-azul-noturno overflow-y-auto">
       <div className="relative min-h-full pt-8 px-7 pb-8 flex flex-col">
         {/* geometric accent */}
-        <div className="absolute top-[90px] right-[-40px] w-[100px] h-[3px] bg-laranja-360 rotate-[-45deg] opacity-50 pointer-events-none" />
+        <div className="absolute top-[90px] right-[-40px] w-[100px] h-[3px] bg-accent rotate-[-45deg] opacity-50 pointer-events-none" />
 
         {/* hero content */}
         <div className="flex-1 flex flex-col justify-center gap-5 pt-10 pb-8">
-          {/* Logo mock */}
-          <div className="flex items-center gap-2">
-            <svg width="32" height="20" viewBox="0 0 32 20" aria-hidden>
-              <circle cx="8" cy="10" r="8" fill="#FA6800" opacity="0.9" />
-              <circle cx="22" cy="10" r="8" fill="#FA6800" opacity="0.5" />
-            </svg>
-            <span className="text-[18px] font-extrabold text-white tracking-[-2.5px]">
-              cimi360
-            </span>
-          </div>
-
-          {/* Wordmark */}
-          <div className="flex items-baseline gap-1">
-            <span className="text-[20px] font-extrabold text-laranja-360 leading-none">
-              cimi
-            </span>
-            <span className="text-[17px] font-bold text-white leading-none tracking-[1.2px]">
-              LEADS
-            </span>
+          {/* Logo oficial (branco sobre navy) */}
+          <div className="flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/logo-horizontal-branco.png"
+              alt="CIMI Leads"
+              className="w-[60%] max-w-[360px] h-auto"
+            />
           </div>
 
           {/* Pillar label */}
-          <div className="text-[11px] font-bold uppercase tracking-[1.4px] text-laranja-360">
+          <div className="text-[11px] font-bold uppercase tracking-[1.4px] text-accent">
             BOAS-VINDAS.
           </div>
 

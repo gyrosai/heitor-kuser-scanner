@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": "11",
+        "id": 11,
         "title": "Backend taxonomy source of truth",
         "description": "Expose the canonical taxonomy from a single backend module and make it the source of truth for products, profiles, and interest tags.",
         "details": "Implement backend/app/taxonomy.py with immutable constants for INTEREST_TYPES, PRODUCTS, and derived ALLOWED_TAGS. Preserve legacy CIMI Invest profiles in read/validate paths only where required by the PRD, but remove them from the UI-facing profiles list. Add GET /api/taxonomy returning {interest_types, products} with products ordered as CIMI 360, CIMI Invest, Leilão, INDIP, Feirão. Keep the module versioned in the repo and avoid hardcoding taxonomy elsewhere. Pseudo-code: `INTEREST_TYPES = [...]`; `PRODUCTS = [{key,label,profiles:[...]}]`; `ALLOWED_TAGS = set(INTEREST_TYPES) | set(all profiles from PRODUCTS) | legacy profiles`; `return JSONResponse({...})`. Ensure backend validators reference ALLOWED_TAGS so no valid tag is dropped.",
@@ -81,7 +81,7 @@
         "updatedAt": "2026-08-24T20:34:09.876Z"
       },
       {
-        "id": "12",
+        "id": 12,
         "title": "Classification storage migration",
         "description": "Add classification persistence support for the expanded product set while preserving compatibility with existing contacts and history.",
         "details": "Extend the contact classification model to support the existing single-profile-per-product behavior across five products. If the current relational structure cannot represent the new products cleanly, migrate to a jsonb column shaped like `{product_key: profile}` using an idempotent additive migration. Add a migration script that converts existing CIMI 360 and CIMI Invest records without loss, preserves legacy CIMI Invest profiles in historical reads/CSV, and rejects invalid values with 422. Keep old records readable in UI/history, but only offer current profiles in editors. Pseudo-code: `if legacy_schema_inadequate: add classification jsonb`; `migrate_row(old)->new_jsonb`; `validate(product, profile in taxonomy[product])`.",
@@ -174,7 +174,7 @@
         "updatedAt": "2026-08-24T17:55:57.657Z"
       },
       {
-        "id": "13",
+        "id": 13,
         "title": "Frontend classification UI expansion",
         "description": "Update the frontend classification editor and related views to consume taxonomy from the backend and preserve state across editor, batch review, and history.",
         "details": "Refactor the existing classification UI to render five products with the existing checkbox + single-radio-per-product pattern, ordered exactly as specified. Fetch profiles from /api/taxonomy via a cached client helper; never hardcode profile lists in the frontend. Preserve selected state in ContactEditor, the batch review carousel, and historical views. Support backward compatibility for legacy CIMI Invest labels in reads, but only expose the new taxonomy choices in the UI. Pseudo-code: `taxonomy = await getTaxonomyCached()`; `products.map(renderProductChipAndRadioGroup(product.profiles))`; `onChange(updateClassification(productKey, selectedProfile))`.",
@@ -260,7 +260,7 @@
         "updatedAt": "2026-08-24T20:34:09.880Z"
       },
       {
-        "id": "14",
+        "id": 14,
         "title": "Health endpoint with Google token status",
         "description": "Provide health visibility for Google token state so the operator can verify readiness before scanning and saving leads.",
         "details": "Extend GET /api/health to include google_token_status with values valid, expired, or absent based on backend token inspection. Keep the response fast and safe for the frontend to poll. Make sure the endpoint uses structured logging and does not expose secrets. Pseudo-code: `status = inspect_google_token(); return {ok: true, google_token_status: status}`. Add a small frontend status indicator where the operator can see whether reconnection is needed before the event.",
@@ -313,7 +313,7 @@
         "updatedAt": "2026-08-25T13:45:47.262Z"
       },
       {
-        "id": "15",
+        "id": 15,
         "title": "Shared package composition service",
         "description": "Create the shared materials and package composition layer used by email and, optionally, WhatsApp.",
         "details": "Implement backend/app/services/package.py to assemble a message body from a template plus selected materials filtered by product and language. Add support for placeholder replacement for {nome}, {primeiro_nome}, {evento}, and {produto}, removing missing placeholders cleanly instead of leaving undefined text. Ensure only materials with URLs are included in the final package; inactive or blank-link items are excluded and previewed as omitted. Reuse this service for the current post-save email pipeline and later WhatsApp composition. Pseudo-code: `render_template(template.body, context)`; `selected_materials = materials.filter(active && url && matches product/language)`; `body += format_lines(selected_materials)`.",
@@ -396,7 +396,7 @@
         "updatedAt": "2026-08-24T22:56:37.304Z"
       },
       {
-        "id": "16",
+        "id": 16,
         "title": "Materials storage and admin APIs",
         "description": "Add materials persistence and administration APIs, including CSV import, list/read/update, and reordering.",
         "details": "Create the materials table with the PRD schema: id, product, group, label, language nullable, url, sort_order, active, meta jsonb, created_at. Implement GET/PUT-style admin endpoints and an idempotent CSV import endpoint keyed by (product, group, label, language). Accept the Henrique CSV layout, mark rows without URLs as inactive, and keep all operations guarded by X-Admin-Token from environment config. Pseudo-code: `upsert_material(unique_key, fields)`; `if not url: active=false`; `sort_order = provided_or_append`.",
@@ -509,7 +509,7 @@
         "updatedAt": "2026-08-24T20:55:26.929Z"
       },
       {
-        "id": "17",
+        "id": 17,
         "title": "Materials admin interface",
         "description": "Build the materials administration screen for operators to manage the link-based library inside the app.",
         "details": "Implement a dedicated Materiais page in Next.js/Tailwind with grouping by product and group, showing active state, edit controls for label and url, and drag/reorder or explicit up/down controls. Use the shared cached materials client helper and keep the UI lightweight so it does not block scanning. No file uploads should be added. Pseudo-code: `const materials = await getMaterialsCached()`; `renderTableByProductGroup()`; `onSave(updateMaterial)`; `onToggleActive()`; `onReorder(moveItem)`. Ensure the page respects admin-token-protected endpoints.",
@@ -589,7 +589,7 @@
         "updatedAt": "2026-08-24T20:34:24.769Z"
       },
       {
-        "id": "18",
+        "id": 18,
         "title": "Email package selection and preview UI",
         "description": "Extend the email media-kit section in the contact editor to support product-specific package selection, preview, and resend behavior.",
         "details": "Enhance the existing \"Mídia kit por e-mail\" section with a product selector, material checklist, and live preview driven by the shared package service. Preselect a single product when the contact has only one product classification. Auto-check materials from the group Institucional and those matching the chosen language (PT/EN/ES), but allow manual changes before send. Keep the legacy fixed media-kit behavior when no product is selected. Add a resend action from contact history that reuses the same composition pipeline. Pseudo-code: `if singleProduct: selectedProduct = that`; `selectedMaterials = autoPickByGroupAndLanguage()`; `preview = buildPackage(template, selectedMaterials)`; `sendOnSave = checkboxValue`.",
@@ -705,7 +705,7 @@
         "updatedAt": "2026-08-24T22:56:37.322Z"
       },
       {
-        "id": "19",
+        "id": 19,
         "title": "Email send pipeline and send history",
         "description": "Persist each sent package and extend the existing email send pipeline so package sends are recorded and replayable.",
         "details": "Extend the current post-save Gmail SMTP workflow to accept product, language, material_ids, and template_id while preserving existing fields email_status, email_sent_at, and email_error. Create the sent_materials table with contact_id, channel, product, language, material_ids int[], message_snapshot, sent_at, and status. Record every send, including resend from history, with channel=email. If the contact has no valid email, disable sending and surface a clear UI message. Keep the legacy fixed media-kit send path available when no product is selected. Pseudo-code: `if !contact.email: disable`; `message = composePackage(...)`; `smtp.send(message)`; `insert sent_materials(...)`; `update email_status`.",
@@ -818,7 +818,7 @@
         "updatedAt": "2026-08-24T22:56:37.326Z"
       },
       {
-        "id": "20",
+        "id": 20,
         "title": "Structured events and event migration",
         "description": "Add event persistence and migration so contacts can reference structured events while preserving the existing event_tag compatibility layer.",
         "details": "Create the events table with the PRD schema and expose CRUD endpoints under /api/events. Add event_id nullable FK to scanned_contacts and, on save with event_id, populate event_tag with the event name for backward compatibility with filters and CSV. Implement migration scripts that convert existing free-text event_tag values into events idempotently using normalization (trim, case, spacing) and a dry-run report. Add UI support for selecting an active event and clearing it, with persistence across scans replacing localStorage-based event_tag storage. Pseudo-code: `event = selectEvent()`; `contact.event_id = event.id`; `contact.event_tag = event.name`; `migrateDistinctTagsToEvents()`.",
@@ -915,7 +915,7 @@
         "expansionPrompt": "Decompose into events schema and CRUD APIs, scanned_contacts FK updates, compatibility writes to event_tag, idempotent normalization-based migration, UI selection/clear behavior, and API/UI tests for persistence coherence."
       },
       {
-        "id": "21",
+        "id": 21,
         "title": "Import, export, and release hardening",
         "description": "Implement import, export, observability, and operational safeguards required to ship safely before the event.",
         "details": "Add POST /api/contacts/import for Google Contacts CSV with dedup by normalized phone/email, source assignment, and a report of created/ignored/conflicts. Make DuplicateModal compare against imported contacts too. Update CSV export to include products, profiles, event_name, and event_date. Ensure all new backend routes use the timeout-enabled fetch path on the frontend, structured logging, and Sentry breadcrumbs. Add staging and release guardrails: Vercel preview as staging, Railway PR environment with separate DB, pg_dump before migrations, pre-commit blocking main, and documentation for rollback and 10-step smoke testing. Also add IndexedDB version bumps only through db.ts and keep offline cache helpers for taxonomy/materials. Pseudo-code: `import_csv(rows)->dedup_normalized_contacts`; `export_csv(add_new_columns)`; `log_request(route,status,duration,contact_id)`; `guard_admin_routes(X-Admin-Token)`.",
@@ -1042,7 +1042,7 @@
         "updatedAt": "2026-08-26T05:09:49.946Z"
       },
       {
-        "id": "22",
+        "id": 22,
         "title": "chore(frontend): corrigir lint pré-existente",
         "description": "Corrigir os 4 erros de lint pré-existentes identificados na revisão da branch feature/11-taxonomy-five-products (não corrigidos ali por estarem fora do escopo daquela branch).",
         "details": "Erros atuais (`npm run lint`), nenhum introduzido por feature/11-taxonomy-five-products:\n\n1. frontend/src/components/ContactPreview.tsx:114 — `react-hooks/set-state-in-effect`: `setForm(...)` chamado direto dentro de um useEffect (hidratação do event_tag salvo em localStorage). Avaliar mover pra state inicial (useState lazy init) em vez de efeito.\n2. frontend/src/components/Scanner.tsx:100 — `@typescript-eslint/no-explicit-any`: tipar o valor (provavelmente resultado de lib de captura/QR) em vez de `any`.\n3. frontend/src/components/Scanner.tsx:151 — `@typescript-eslint/no-explicit-any`: mesmo caso, outro ponto do arquivo.\n4. frontend/src/components/contact/ObservacaoAudio.tsx:18 — `react-hooks/set-state-in-effect`: `setElapsed(0)` chamado direto dentro de useEffect quando `active` vira false.\n\nRodar `cd frontend && npm run lint` antes e depois pra confirmar que zera os 4 erros sem introduzir novos, e que os componentes afetados (preview de contato, scanner de cartão/QR, observação por áudio) continuam funcionando (cobrir com teste manual ou vitest onde fizer sentido).",
@@ -1053,7 +1053,7 @@
         "subtasks": []
       },
       {
-        "id": "23",
+        "id": 23,
         "title": "Batch ReviewCarousel package selection and dispatch",
         "description": "Implement batch mode for ReviewCarousel so each item uses the same product, language, and material selection rules as the individual flow, with sequence-level defaults in SequenceKitConfig and per-item overrides. Add batch endpoint support for a package payload per item, preselect materials by classification, and reuse the existing email dispatch pipeline.",
         "details": "Extend the ReviewCarousel batch flow to consume a package configuration shaped consistently with the individual email kit flow: product, language, selected material IDs, and any preview metadata needed by the UI. Add SequenceKitConfig defaults for the batch context so a sequence can define the baseline product/language/material rules once, while allowing each item in the batch to override product, language, or package selection when explicitly provided.\n\nOn the frontend, update ReviewCarousel so it derives the initial selection state from the contact classification, using the same product auto-selection logic already used in the individual flow. When the contact has a single compatible product classification, preselect it automatically; otherwise keep the selector explicit. Apply the same language and material defaulting rules used by the existing package composer, including institutional materials and language-matching materials, but allow per-item overrides to persist independently for each batch row/card.\n\nOn the backend, update the batch endpoint to accept a package object per item rather than a single shared package for the whole request. Validate each item independently, resolve the effective package using item overrides first and SequenceKitConfig defaults second, then dispatch the email through the same send pipeline used for individual sends so sent history, status, timestamps, and error handling remain uniform. Preserve compatibility with existing batch requests by supporting fallback behavior when a package is omitted on an item and by rejecting malformed package shapes with clear validation errors.\n\nEnsure the batch preview and submit path use the shared package composition service so rendered content, placeholder handling, filtering of inactive or URL-less materials, and output consistency match the individual flow. Keep logging and error messages item-scoped so one invalid item does not obscure successful sends for other items in the same batch, unless the endpoint contract requires all-or-nothing semantics.",
@@ -1068,16 +1068,46 @@
         "priority": "high",
         "subtasks": [],
         "updatedAt": "2026-08-25T13:16:24.825Z"
+      },
+      {
+        "id": 24,
+        "title": "Rebrand CIMI Leads com nova identidade visual",
+        "description": "Aplicar o novo branding do CIMI Leads na interface e nos ativos do app, atualizando a identidade visual para os tokens teal/navy, tipografia Montserrat, logo e ícones PWA. A entrega deve cobrir os principais pontos de contato do frontend e garantir consistência visual sem quebrar fluxos existentes.",
+        "details": "Implementar a camada de identidade visual do rebrand em todo o frontend, começando pela definição centralizada de design tokens para a nova paleta teal/navy, escala de cinzas de apoio, estados de foco/hover/erro e variáveis de interface reutilizáveis. Atualizar o tema global para usar Montserrat como tipografia padrão, incluindo fallback seguro, ajustes de line-height/peso e revisão de componentes que dependam de estilos tipográficos hardcoded.\n\nSubstituir o logo atual pelos novos arquivos fornecidos, garantindo versões adequadas para header, login, favicon e demais superfícies onde a marca aparece. Atualizar o manifesto e os assets PWA com novos ícones em múltiplos tamanhos, splash/shortcut icons quando aplicável, e validar que o app continue instalável e corretamente identificado em dispositivos móveis.\n\nRevisar componentes de alto impacto visual para aderirem ao novo sistema: botões, links, inputs, cards, badges, navegação, telas de autenticação e estados vazios. Preservar a usabilidade e contraste mínimo, ajustando tokens conforme necessidade para manter acessibilidade WCAG. Se houver suporte a modo claro/escuro, mapear o rebrand para ambos os temas sem duplicar lógica. Centralizar os assets novos em uma estrutura versionada e remover referências antigas após validação.",
+        "testStrategy": "Validar visualmente as principais telas do app para confirmar aplicação consistente da paleta teal/navy, Montserrat e do novo logo. Executar checks automáticos de build/lint para garantir que a troca de tokens e assets não introduziu regressões de compilação.\n\nVerificar manualmente a instalação PWA em desktop e mobile, confirmando ícones e nome da aplicação corretos no manifesto, na tela inicial e no atalho do navegador. Testar contraste e legibilidade em componentes principais com inspeção de acessibilidade, incluindo estados de foco, erro e hover.\n\nFazer regressão dos fluxos críticos de login, navegação, cadastro/edição e telas vazias para assegurar que o novo branding não alterou comportamento funcional. Se existirem snapshots visuais ou testes E2E, atualizar as expectativas apenas para mudanças de identidade visual aprovadas.",
+        "status": "done",
+        "dependencies": [
+          "11",
+          "12",
+          "19"
+        ],
+        "priority": "high",
+        "subtasks": [],
+        "updatedAt": "2026-08-26T05:28:50.080Z"
+      },
+      {
+        "id": 25,
+        "title": "chore(frontend): renomear tokens legados para aliases semânticos",
+        "description": "Renomear as ~72 ocorrências de laranja-360/azul-noturno/azul-atlantico para os aliases primary/accent/accent-soft e remover os nomes legados de globals.css e tokens.ts. Pós-evento, baixa prioridade.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "low",
+        "subtasks": []
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-26T05:09:49.946Z",
-      "taskCount": 13,
-      "completedCount": 9,
+      "lastModified": "2026-08-26T05:28:50.084Z",
+      "taskCount": 14,
+      "completedCount": 10,
       "tags": [
         "master"
-      ]
+      ],
+      "created": "2026-08-26T05:28:58.667Z",
+      "description": "Tasks for master context",
+      "updated": "2026-08-26T05:28:58.670Z"
     }
   }
 }

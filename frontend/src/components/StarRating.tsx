@@ -59,7 +59,7 @@ export default function StarRating({
           >
             <svg
               className={`${SIZE_CLASS[size]} transition-colors ${
-                active ? "text-[#FA6801]" : "text-slate-300"
+                active ? "text-accent" : "text-slate-300"
               }`}
               fill={active ? "currentColor" : "none"}
               stroke="currentColor"

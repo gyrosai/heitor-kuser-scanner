@@ -201,7 +201,7 @@ export default function ProcessingScreen({
   const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-app-bg">
       <header className="border-b border-slate-200 bg-white px-4 py-3">
         <p className="text-base font-semibold text-slate-800">
           Processando cartões
@@ -217,7 +217,7 @@ export default function ProcessingScreen({
       <div className="px-4 py-4">
         <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full bg-[#FA6801] transition-all duration-300"
+            className="h-full bg-accent transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -245,14 +245,14 @@ export default function ProcessingScreen({
           <>
             <button
               onClick={handleRetryErrors}
-              className="w-full rounded-xl bg-[#FA6801] py-[14px] text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
+              className="w-full rounded-xl bg-primary py-[14px] text-base font-semibold text-white active:brightness-110 transition-colors"
               style={{ minHeight: 52 }}
             >
               Tentar novamente ({failed})
             </button>
             <button
               onClick={onDone}
-              className="w-full rounded-xl border border-[#FA6801]/30 bg-white py-[14px] text-base font-semibold text-[#FA6801] active:bg-[#FFF3EB] transition-colors"
+              className="w-full rounded-xl border border-accent bg-white py-[14px] text-base font-semibold text-primary active:bg-accent-soft transition-colors"
               style={{ minHeight: 52 }}
             >
               Pular erros e revisar
@@ -262,7 +262,7 @@ export default function ProcessingScreen({
         {done && failed === 0 && (
           <button
             onClick={onDone}
-            className="w-full rounded-xl bg-[#FA6801] py-[14px] text-base font-semibold text-white active:bg-[#E55D00] transition-colors"
+            className="w-full rounded-xl bg-primary py-[14px] text-base font-semibold text-white active:brightness-110 transition-colors"
             style={{ minHeight: 52 }}
           >
             Revisar contatos
