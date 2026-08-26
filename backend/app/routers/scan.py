@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import defer
 
 from app.database import async_session, get_db
@@ -28,8 +28,18 @@ from app.models import (
     SendEmailRequest,
     SendEmailResponse,
 )
-from app.taxonomy import format_csv_columns, get_taxonomy_payload, parse_classification_tags
-from app.services import contact_normalize, image_service, ocr_service, qrcode_service, vcard_service
+from app.services import (
+    contact_normalize,
+    image_service,
+    ocr_service,
+    qrcode_service,
+    vcard_service,
+)
+from app.taxonomy import (
+    format_csv_columns,
+    get_taxonomy_payload,
+    parse_classification_tags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +306,6 @@ async def create_vcard(
                     )
                 )
             if email_or_phone:
-                from sqlalchemy import or_
 
                 dup_query = (
                     select(ScannedContact)
@@ -338,7 +347,6 @@ async def create_vcard(
                             )
                         )
                 if imported_conflict:
-                    from sqlalchemy import or_
 
                     imported_query = (
                         select(ScannedContact)
@@ -369,8 +377,6 @@ async def create_vcard(
         db_contact.phone_e164 = contact_normalize.phone_to_e164(contact.phone)
         db_contact.email = contact.email
         db_contact.email_norm = contact_normalize.email_normalize(contact.email)
-        db_contact.phone = contact.phone
-        db_contact.email = contact.email
         db_contact.company = contact.company
         db_contact.role = contact.role
         db_contact.website = contact.website
@@ -390,7 +396,6 @@ async def create_vcard(
         # direto como não-draft. Quando o frontend novo (PR 2) chegar, ele
         # sempre manda contact_id e este branch não é mais usado.
         from datetime import timedelta
-        from sqlalchemy import or_
 
         draft_window = datetime.now(timezone.utc) - timedelta(minutes=5)
         promote_filters = [
@@ -641,7 +646,13 @@ async def export_contacts_csv(
     if db is None:
         raise HTTPException(status_code=503, detail="Banco de dados não configurado")
 
-    filters = [ScannedContact.is_draft.is_(False)]
+    # Exclui a base importada (base_heitor): o CSV é de leads de campo; sem
+    # este filtro os ~8.900 contatos importados vazariam para o export.
+    # Consistente com o default de GET /api/contacts.
+    filters = [
+        ScannedContact.is_draft.is_(False),
+        ScannedContact.source != "base_heitor",
+    ]
     if event_tag:
         filters.append(ScannedContact.event_tag == event_tag)
     if min_importance is not None:
@@ -757,7 +768,6 @@ async def list_contacts(
         filters.append(ScannedContact.tags.op("&&")(list(tags)))
     if search:
         like = f"%{search}%"
-        from sqlalchemy import or_
 
         filters.append(
             or_(

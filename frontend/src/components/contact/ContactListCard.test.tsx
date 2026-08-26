@@ -74,3 +74,29 @@ describe("ContactListCard — last_send", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ContactListCard — base_heitor (importado)", () => {
+  const IMPORTED: ContactRecord = {
+    ...BASE,
+    source: "base_heitor",
+    google_contact_id: "people/c123",
+    email_status: "sent",
+  };
+
+  it("mostra o badge 'Base Heitor'", () => {
+    render(<ContactListCard contact={IMPORTED} onClick={vi.fn()} />);
+    expect(screen.getByText("Base Heitor")).toBeInTheDocument();
+  });
+
+  it("não mostra badges de sync/e-mail para importados", () => {
+    render(<ContactListCard contact={IMPORTED} onClick={vi.fn()} />);
+    // importados nunca sincronizam nem recebem e-mail pelo app
+    expect(screen.queryByText(/Sincronizado|Sync pendente/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/E-mail enviado/)).not.toBeInTheDocument();
+  });
+
+  it("contato normal não mostra o badge 'Base Heitor'", () => {
+    render(<ContactListCard contact={BASE} onClick={vi.fn()} />);
+    expect(screen.queryByText("Base Heitor")).not.toBeInTheDocument();
+  });
+});

@@ -16,8 +16,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from fastapi import HTTPException
+
 from app.db_models import EmailLog, ScannedContact
-from app.routers.scan import list_contact_sends, list_contacts
+from app.models import ContactData
+from app.routers.scan import (
+    create_vcard,
+    export_contacts_csv,
+    list_contact_sends,
+    list_contacts,
+)
 
 
 def _make_contact(id: int, **overrides) -> ScannedContact:
@@ -191,3 +199,77 @@ async def test_list_contact_sends_empty_history():
 
     out = await list_contact_sends(contact_id=999, db=db)
     assert out == {"sends": []}
+
+
+@pytest.mark.asyncio
+async def test_create_vcard_409_match_type_imported():
+    """Ao salvar um contato cujo email/telefone já existe na base_heitor,
+    o create_vcard levanta 409 com match_type='imported' — o frontend usa
+    isso para mostrar 'Já está na base do Heitor' no DuplicateModal."""
+    editing = _make_contact(1, email="lead@example.com", phone=None)
+    imported = _make_contact(
+        50, source="base_heitor", email="lead@example.com", phone=None
+    )
+
+    # 1ª execute: fetch do contato sendo editado (contact_id=1)
+    fetch_result = MagicMock()
+    fetch_result.scalar_one_or_none.return_value = editing
+    # 2ª execute: dedup scanned (mesmo event_tag) → nada
+    scanned_result = MagicMock()
+    scanned_result.scalar_one_or_none.return_value = None
+    # 3ª execute: dedup importados → encontra a base_heitor
+    imported_result = MagicMock()
+    imported_result.scalar_one_or_none.return_value = imported
+
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        side_effect=[fetch_result, scanned_result, imported_result]
+    )
+
+    contact = ContactData(
+        name="Lead", email="lead@example.com", event_tag="CIMI2026"
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await create_vcard(
+            contact=contact,
+            background_tasks=MagicMock(),
+            contact_id=1,
+            force=False,
+            db=db,
+            current_user=MagicMock(email="op@cimi360.com.br"),
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["match_type"] == "imported"
+    assert exc.value.detail["existing_id"] == 50
+
+
+@pytest.mark.asyncio
+async def test_export_csv_excludes_base_heitor_and_has_new_columns():
+    """O export.csv NÃO pode vazar a base importada (base_heitor) para o CSV
+    de leads de campo, e precisa das colunas Produtos/Perfis/Evento."""
+    c1 = _make_contact(1, event_tag="CIMI2026", tags=["cimi_360:stand", "leilao"])
+
+    captured = {}
+
+    async def fake_execute(stmt):
+        captured["sql"] = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        result = MagicMock()
+        result.all.return_value = [(c1, False)]
+        return result
+
+    db = AsyncMock()
+    db.execute = fake_execute
+
+    resp = await export_contacts_csv(db=db, tags=None)
+    body = resp.body.decode("utf-8")
+
+    # Filtro de exclusão dos importados foi para a query
+    assert "base_heitor" in captured["sql"]
+    # Colunas novas no cabeçalho
+    assert "Produtos" in body
+    assert "Perfis" in body
+    assert "Evento" in body
+    # Dado do contato de campo presente
+    assert "CIMI2026" in body

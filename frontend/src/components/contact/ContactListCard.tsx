@@ -219,8 +219,14 @@ export function ContactListCard({ contact, onClick, onResend }: ContactListCardP
         )}
 
         <div className="flex flex-wrap items-center gap-[10px] mt-2">
-          <SyncBadge synced={synced} />
-          <EmailBadge status={contact.email_status ?? null} />
+          {isImported ? (
+            <BaseHeitorBadge />
+          ) : (
+            <>
+              <SyncBadge synced={synced} />
+              <EmailBadge status={contact.email_status ?? null} />
+            </>
+          )}
         </div>
 
         {lastSendLabel && (

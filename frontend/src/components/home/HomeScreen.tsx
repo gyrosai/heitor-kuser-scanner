@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Camera, QrCode, Layers, Filter, Download } from 'lucide-react';
-import { ALLOWED_TAGS, ContactRecord, EventInfo, Importance } from '@/lib/types';
+import { ALLOWED_TAGS, ContactRecord, EventInfo } from '@/lib/types';
 import { exportCSV, listContacts, listEvents } from '@/lib/api';
 import type { EmailQuota } from '@/lib/api';
 import { useToast } from '@/components/Toast';

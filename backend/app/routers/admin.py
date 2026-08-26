@@ -93,14 +93,20 @@ async def import_google_contacts_csv(
             errors.append({"line": idx, "reason": "sem telefone/email válido"})
             continue
 
-        # Dedup
+        # Dedup — checa PERTINÊNCIA da chave, não o valor: chaves já vistas
+        # no próprio arquivo são registradas com valor None (id ainda não
+        # existe), então testar `is not None` deixaria passar duplicatas do
+        # mesmo CSV. `existing_id` no relatório fica None nesse caso.
+        is_dup = False
         dup_id = None
         if phone_e164 and phone_e164 in existing_by_phone:
+            is_dup = True
             dup_id = existing_by_phone[phone_e164]
         elif email_norm_val and email_norm_val in existing_by_email:
+            is_dup = True
             dup_id = existing_by_email[email_norm_val]
 
-        if dup_id is not None:
+        if is_dup:
             skipped += 1
             if len(skipped_details) < 20:
                 skipped_details.append({"line": idx, "existing_id": dup_id, "reason": "duplicado"})

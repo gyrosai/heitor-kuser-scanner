@@ -510,6 +510,7 @@ export default function Home() {
           onForceCreate={handleForceCreate}
           onCancel={handleDuplicateCancel}
           busy={saving}
+          matchType={conflict.match_type}
         />
       );
     }

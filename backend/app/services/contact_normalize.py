@@ -1,12 +1,11 @@
 import logging
-from typing import Optional
 
 import phonenumbers
 
 logger = logging.getLogger(__name__)
 
 
-def phone_to_e164(raw: Optional[str], region: str = "BR") -> Optional[str]:
+def phone_to_e164(raw: str | None, region: str = "BR") -> str | None:
     """Normaliza telefone para E.164. Retorna None se inválido."""
     if not raw or not isinstance(raw, str):
         return None
@@ -25,7 +24,7 @@ def phone_to_e164(raw: Optional[str], region: str = "BR") -> Optional[str]:
         return None
 
 
-def email_normalize(raw: Optional[str]) -> Optional[str]:
+def email_normalize(raw: str | None) -> str | None:
     """Normaliza e-mail: lowercase, strip. Retorna None se vazio."""
     if not raw or not isinstance(raw, str):
         return None

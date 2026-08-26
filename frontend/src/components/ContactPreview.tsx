@@ -266,7 +266,7 @@ export default function ContactPreview({
         <CapturePreview
           cardImageDataUrl={capturedDataUrl}
           capturedAt={new Date()}
-          source={contact.source}
+          source={contact.source === "base_heitor" ? "card_photo" : contact.source}
           extractedFields={countNonEmptyFields(contact)}
         />
 

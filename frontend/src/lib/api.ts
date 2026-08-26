@@ -491,6 +491,7 @@ export async function saveContact(
       existing_id: detail.existing_id,
       new: detail.new,
       message: detail.message,
+      match_type: detail.match_type,
     });
   }
 
