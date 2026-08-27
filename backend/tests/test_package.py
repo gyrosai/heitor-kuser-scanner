@@ -347,9 +347,9 @@ def test_subject_passthrough():
         material_ids=[],
         materials=[],
         template_body="Corpo.",
-        subject="Foi um prazer te conhecer no CIMI2026 — CIMI",
+        subject="Foi um prazer te conhecer no CIMI2026",
     )
-    assert result.subject == "Foi um prazer te conhecer no CIMI2026 — CIMI"
+    assert result.subject == "Foi um prazer te conhecer no CIMI2026"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

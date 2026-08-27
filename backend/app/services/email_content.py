@@ -7,9 +7,9 @@
 CONTENT_VERSION = "henrique-v1-2026-06-10"
 
 SUBJECTS = {
-    "pt-BR": "Foi um prazer te conhecer no {evento} — CIMI",
-    "en": "It was a pleasure meeting you at {evento} — CIMI",
-    "es": "Fue un placer conocerte en {evento} — CIMI",
+    "pt-BR": "Foi um prazer te conhecer no {evento}",
+    "en": "It was a pleasure meeting you at {evento}",
+    "es": "Fue un placer conocerte en {evento}",
 }
 
 AFTERMOVIE_URLS = {
