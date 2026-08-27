@@ -359,7 +359,7 @@ export default function ReviewCarousel({
     };
 
     try {
-      await saveContact(payload, current.scan.contact_id ?? undefined, false, { downloadVCard: false });
+      await saveContact(payload, current.scan.contact_id ?? undefined, false);
       await commitScan();
       setSavedCount((n) => n + 1);
       if (finishAfter || currentIndex >= items.length - 1) {
@@ -370,7 +370,7 @@ export default function ReviewCarousel({
         const strategy = sequenceEmailConfig?.conflictStrategy ?? "ask";
         if (strategy === "replace" || strategy === "keep_both") {
           try {
-            await saveContact(payload, current.scan.contact_id ?? undefined, true, { downloadVCard: false });
+            await saveContact(payload, current.scan.contact_id ?? undefined, true);
             await commitScan();
             setReplacedCount((n) => n + 1);
             showToast(`${payload.name} substituído (já existia)`, "info");

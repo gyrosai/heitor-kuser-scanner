@@ -446,15 +446,12 @@ export function exportCSV(filters?: {
  * Salva um contato (POST /api/vcard). Se contactId for fornecido e o backend
  * detectar duplicata, lança ApiConflictError (409).
  *
- * Por padrão NÃO dispara download de vCard — use { downloadVCard: true } nos
- * call-sites onde o download é comportamento esperado (ex: save de cartão
- * individual). O carrossel (modo Em sequência) não deve passar essa opção.
+ * A saída de contatos é o Google Contacts; não há mais download de vCard.
  */
 export async function saveContact(
   contact: ContactData,
   contactId?: number,
   force = false,
-  options?: { downloadVCard?: boolean },
 ): Promise<void> {
   const url = mkUrl("/api/vcard");
   if (contactId != null) url.searchParams.set("contact_id", String(contactId));
@@ -506,17 +503,6 @@ export async function saveContact(
       });
       throw err;
     }
-  }
-
-  if (options?.downloadVCard === true) {
-    const text = await res.text();
-    const blob = new Blob([text], { type: "text/x-vcard;charset=utf-8" });
-    const blobUrl = URL.createObjectURL(blob);
-    const newWindow = window.open(blobUrl, "_blank");
-    if (!newWindow) {
-      window.location.href = blobUrl;
-    }
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
   }
 }
 

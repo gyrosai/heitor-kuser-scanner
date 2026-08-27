@@ -216,7 +216,7 @@ export default function Home() {
         },
       });
       try {
-        await saveContact(editedContact, contactId ?? undefined, force, { downloadVCard: true });
+        await saveContact(editedContact, contactId ?? undefined, force);
         Sentry.addBreadcrumb({
           category: "save",
           message: "save:success",
